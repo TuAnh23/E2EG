@@ -1,6 +1,7 @@
 """
-Code taken from OGB for ogbn-arxiv dataset:
+Code derived from OGB for ogbn-arxiv dataset:
 https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/arxiv
+We add the option of only using node degree feature, and not node text feature.
 """
 import argparse
 
@@ -9,6 +10,7 @@ import torch.nn.functional as F
 
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv, SAGEConv
+from torch_geometric.utils import degree
 
 from ogb.nodeproppred import PygNodePropPredDataset, Evaluator
 
@@ -119,6 +121,9 @@ def main():
     parser = argparse.ArgumentParser(description='OGBN-Arxiv (GNN)')
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--log_steps', type=int, default=1)
+    parser.add_argument('--node_feature', type=str, default='default',
+                        help="'default': Default node feature is the vectorized text provided by OGB\n" +
+                             "'degree': use node degree as node feature")
     parser.add_argument('--use_sage', action='store_true')
     parser.add_argument('--num_layers', type=int, default=3)
     parser.add_argument('--hidden_channels', type=int, default=256)
@@ -133,9 +138,19 @@ def main():
     device = torch.device(device)
 
     dataset = PygNodePropPredDataset(name='ogbn-arxiv',
-                                     transform=T.ToSparseTensor())
+                                     root='data')
 
     data = dataset[0]
+
+    if args.node_feature == 'degree':
+        # Construct node features based on node in-degree and out-degree
+        x_degree = torch.stack([degree(data.edge_index[0], data.num_nodes),
+                                degree(data.edge_index[1], data.num_nodes)],
+                               dim=1)
+        data.x = x_degree
+
+    transform = T.ToSparseTensor()
+    transform(data)
     data.adj_t = data.adj_t.to_symmetric()
     data = data.to(device)
 
