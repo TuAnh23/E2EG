@@ -1,0 +1,13 @@
+*.DS_Store
+.eggs/*
+libpecos.egg-info/*
+.idea/*
+*.pyc
+
+# Ignore all files in data/ except for the description file
+data/*
+!data/README.md
+
+# Ignore all files in experiments/ except for the description file
+experiments/*
+!experiments/README.md
