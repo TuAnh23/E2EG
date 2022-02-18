@@ -76,3 +76,31 @@ Set up and install PECOS dependencies:
 ```bash
 python3 -m pip install --editable ./
 ```
+
+## Reproduce results
+
+### Baseline models
+Train graphSAGE on node degree:
+```bash
+mkdir experiments/graphSAGE_nodedegree
+python -u baseline_models/gnn.py \
+  --use_sage \
+  --node_feature degree \
+  --hidden_channels 50 | tee -a experiments/graphSAGE_nodedegree/train.log
+```
+
+Train transformer using only node text attribute:
+```bash
+# Download data
+cd data/proc_data_xrt
+dataset=ogbn-arxiv
+bash download_data.sh ${dataset}
+cd ../../
+# Train model
+mkdir experiments/bert_classifier
+source activate giant-xrt
+python -u baseline_models/bert_classifier.py \
+  --raw-text-path data/proc_data_xrt/ogbn-arxiv/X.all.txt \
+  --text_tokenizer_path data/proc_data_xrt/ogbn-arxiv/xrt_models/text_encoder/text_tokenizer \
+  | tee -a experiments/bert_classifier/train.log
+```
