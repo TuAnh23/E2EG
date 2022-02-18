@@ -9,6 +9,7 @@ import argparse
 from ogb.nodeproppred import PygNodePropPredDataset
 from torch.optim import AdamW
 from tqdm import tqdm
+import os
 
 
 class BertClassifier(nn.Module):
@@ -61,7 +62,7 @@ class Dataset(torch.utils.data.Dataset):
         return batch_texts, batch_y
 
 
-def train(model, train_X, train_y, val_X, val_y, learning_rate, epochs, batch_size, adam_epsilon):
+def train(model, train_X, train_y, val_X, val_y, learning_rate, epochs, batch_size, adam_epsilon, model_dir):
     train, val = Dataset(train_X, train_y), Dataset(val_X, val_y)
 
     train_dataloader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True)
@@ -123,6 +124,8 @@ def train(model, train_X, train_y, val_X, val_y, learning_rate, epochs, batch_si
                 | Val Loss: {total_loss_val / len(val_X): .3f} \
                 | Val Accuracy: {total_acc_val / len(val_X): .3f}')
 
+        torch.save(model, model_dir + f'/e{epoch_num + 1:03d}val{total_acc_val / len(val_X):.3f}.pt')
+
 
 def evaluate(model, test_X, test_y):
     test = Dataset(test_X, test_y)
@@ -154,6 +157,7 @@ def evaluate(model, test_X, test_y):
 def main():
     parser = argparse.ArgumentParser(description='Train BERT classifier baseline. Default hyper-params are similar '
                                      + 'to the BERT model used for GIANT.')
+    parser.add_argument('--model_dir', type=str, default='./')
     parser.add_argument('--dataset', type=str, default='ogbn-arxiv')
     parser.add_argument('--data_root_dir', type=str, default='data')
     parser.add_argument('--raw-text-path', type=str, required=True,
@@ -178,22 +182,31 @@ def main():
     X = [tokenizer(text, padding='max_length', max_length=args.truncate_length,
                    truncation=True, return_tensors="pt")
          for text in node_text_list]
-    torch.save(X, 'tokenized_text.pt')
 
     # Get targets from the standard OGB data
     dataset = PygNodePropPredDataset(name=args.dataset, root=args.data_root_dir)
     data = dataset[0]
     y = torch.flatten(data.y)
 
+    # Use standard train-val-test split
     split_idx = dataset.get_idx_split()
     train_idx, valid_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]
 
+    # Train the model
     model = BertClassifier(num_classes=40, dropout=args.dropout, pretrain=args.pretrain)
-
     train(model, [X[i] for i in train_idx], y[train_idx], [X[i] for i in valid_idx], y[valid_idx],
-          args.learning_rate, args.epochs, args.batch_size, args.adam_epsilon)
+          args.learning_rate, args.epochs, args.batch_size, args.adam_epsilon, args.model_dir)
 
-    evaluate(model, [X[i] for i in test_idx], y[test_idx])
+    # Evaluate the model with the highest validation accuracy
+    best_model_path = None
+    best_val_acc = -1
+    for filename in os.listdir(args.model_dir):
+        if filename.endswith('.pt') and float(str(filename)[7:12]) > best_val_acc:
+            best_val_acc = float(str(filename)[7:12])
+            best_model_path = os.path.join(args.model_dir, filename)
+    print(f'Best model path: {best_model_path}')
+    best_model = torch.load(best_model_path)
+    evaluate(best_model, [X[i] for i in test_idx], y[test_idx])
 
 
 if __name__ == "__main__":

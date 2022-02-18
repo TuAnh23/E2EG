@@ -16,3 +16,7 @@ data/proc_data_xrt/*
 # Ignore all files in experiments/ except for the description file
 experiments/*
 !experiments/README.md
+
+# Ignore all files in models/ except for the description file
+models/*
+!models/README.md

@@ -98,8 +98,10 @@ bash download_data.sh ${dataset}
 cd ../../
 # Train model
 mkdir experiments/bert_classifier
+mkdir models/bert_classifier
 source activate giant-xrt
 python -u baseline_models/bert_classifier.py \
+  --model_dir models/bert_classifier \
   --raw-text-path data/proc_data_xrt/ogbn-arxiv/X.all.txt \
   --text_tokenizer_path data/proc_data_xrt/ogbn-arxiv/xrt_models/text_encoder/text_tokenizer \
   | tee -a experiments/bert_classifier/train.log
