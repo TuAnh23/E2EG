@@ -3,6 +3,8 @@
 libpecos.egg-info/*
 .idea/*
 *.pyc
+*.pickle
+*/.ipynb_checkpoints/*
 
 # Ignore all files in data/ except for the description and script files
 data/*
