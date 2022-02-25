@@ -92,7 +92,7 @@ python -u baseline_models/gnn.py \
 Train transformer using only node text attribute:
 ```bash
 # Download data
-cd data/proc_data_xrt
+cd data/proc_data_multi_task
 dataset=ogbn-arxiv
 bash download_data.sh ${dataset}
 cd ../../
@@ -102,7 +102,19 @@ mkdir models/bert_classifier
 source activate giant-xrt
 python -u baseline_models/bert_classifier.py \
   --model_dir models/bert_classifier \
-  --raw-text-path data/proc_data_xrt/ogbn-arxiv/X.all.txt \
-  --text_tokenizer_path data/proc_data_xrt/ogbn-arxiv/xrt_models/text_encoder/text_tokenizer \
+  --raw-text-path data/proc_data_multi_task/ogbn-arxiv/X.all.txt \
+  --text_tokenizer_path data/proc_data_multi_task/ogbn-arxiv/xrt_models/text_encoder/text_tokenizer \
   | tee -a experiments/bert_classifier/train.log
+```
+
+### Proposed models
+```bash
+# Download data
+cd data/proc_data_multi_task
+dataset=ogbn-arxiv
+bash download_data.sh ${dataset}
+cd ../../
+# Process data
+source activate giant-xrt
+bash proc_data_multi_task.sh ${dataset}
 ```

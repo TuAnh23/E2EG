@@ -9,11 +9,11 @@ libpecos.egg-info/*
 # Ignore all files in data/ except for the description and script files
 data/*
 !data/README.md
-!data/proc_data_xrt/
+!data/proc_data_multi_task/
 
-data/proc_data_xrt/*
-!data/proc_data_xrt/download_data.sh
-!data/proc_data_xrt/vect_config.json
+data/proc_data_multi_task/*
+!data/proc_data_multi_task/download_data.sh
+!data/proc_data_multi_task/vect_config.json
 
 # Ignore all files in experiments/ except for the description file
 experiments/*
