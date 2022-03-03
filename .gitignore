@@ -22,3 +22,6 @@ experiments/*
 # Ignore all files in models/ except for the description file
 models/*
 !models/README.md
+
+# Ignore plots
+visualization/*
