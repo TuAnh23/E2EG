@@ -266,6 +266,89 @@ class BertForXMC(BertPreTrainedModel):
 
 
 @add_start_docstrings(
+    """Bert Model with two classification heads on top: one for eXtreme Multi-label Classification (XMC) and one for 
+     the common Multi-class Classification.\n""",
+    BERT_START_DOCSTRING,
+)
+class BertForMultiTask(BertPreTrainedModel):
+    """
+    Examples:
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        model = BertForMultiTask.from_pretrained('bert-base-uncased')
+        input_ids = torch.tensor(tokenizer.encode("iphone 11 case", add_special_tokens=True)).unsqueeze(0)
+        outputs = model(input_ids)
+        last_hidden_states = outputs["hidden_states"]
+    """
+
+    def __init__(self, config, num_classes):
+        super(BertForMultiTask, self).__init__(config)
+        self.num_labels = config.num_labels  # Number of labels for multi-label XMC
+
+        self.bert = BertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.linear = nn.Linear(768, num_classes)  # For multi-class classification
+        self.relu = nn.ReLU()  # For multi-class classification
+
+        self.init_weights()
+
+    def init_from(self, model):
+        self.bert = model.bert
+
+    @add_start_docstrings(BERT_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        label_embedding=None,
+    ):
+        r"""
+        Returns:
+          :obj:`dict` containing:
+                {'logits_mlabel': (:obj:`torch.FloatTensor` of shape (batch_size, num_labels)) pred logits for each LABEL
+                in the prediction head for multi-label classification XMC,
+                 'logits_mclass': (:obj:`torch.FloatTensor` of shape (batch_size, num_classes)) pred logits for each CLASS
+                in the prediction head for multi-class classification,
+                 'pooled_output': (:obj:`torch.FloatTensor` of shape (batch_size, hidden_dim)) input sequence embedding vector,
+                 'hidden_states': (:obj:`torch.FloatTensor` of shape (batch_size, sequence_length, hidden_dim)) the last layer hidden states,
+                }
+        """
+        outputs = self.bert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            return_dict=True,
+        )
+        pooled_output = outputs.pooler_output
+        pooled_output = self.dropout(pooled_output)
+        instance_hidden_states = outputs.last_hidden_state
+
+        # For multi-class classification head
+        linear_output = self.linear(pooled_output)
+        logits_mclass = self.relu(linear_output)
+
+        # For multi-label classification XMC head
+        logits_mlabel = None
+        if label_embedding is not None:
+            W_act, b_act = label_embedding
+            W_act = W_act.to(pooled_output.device)
+            b_act = b_act.to(pooled_output.device)
+            logits_mlabel = (pooled_output.unsqueeze(1) * W_act).sum(dim=-1) + b_act.squeeze(2)
+        return {
+            "logits_mlabel": logits_mlabel,
+            "logits_mclass": logits_mclass,
+            "pooled_output": pooled_output,
+            "hidden_states": instance_hidden_states,
+        }
+
+
+@add_start_docstrings(
     """Roberta Model with mutli-label classification head on top for XMC.\n""",
     ROBERTA_START_DOCSTRING,
 )
@@ -493,6 +576,7 @@ class DistilBertForXMC(DistilBertPreTrainedModel):
 
 ENCODER_CLASSES = {
     "bert": TransformerModelClass(BertConfig, BertForXMC, BertTokenizerFast),
+    "bert-multitask": TransformerModelClass(BertConfig, BertForMultiTask, BertTokenizerFast),
     "roberta": TransformerModelClass(RobertaConfig, RobertaForXMC, RobertaTokenizerFast),
     "xlm-roberta": TransformerModelClass(
         XLMRobertaConfig, XLMRobertaForXMC, XLMRobertaTokenizerFast

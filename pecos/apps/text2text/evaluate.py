@@ -128,7 +128,7 @@ def do_evaluation(args):
     Y_true = smat.csr_matrix((val_t, (row_id_t, col_id_t)), shape=(num_samples_t, len(item_dict)))
     Y_pred = smat.csr_matrix((val_p, (row_id_p, col_id_p)), shape=(num_samples_p, len(item_dict)))
 
-    metric = smat_util.Metrics.generate(Y_true, Y_pred, topk=args.topk)
+    metric = smat_util.MetricsMLabel.generate(Y_true, Y_pred, topk=args.topk)
     print("==== evaluation results ====")
     print(metric)
 

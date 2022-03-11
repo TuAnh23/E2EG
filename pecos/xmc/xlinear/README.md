@@ -89,11 +89,13 @@ Xt = XLinearModel.load_feature_matrix("test/tst-data/xmc/xlinear/Xt.npz")
 Y_pred = xlm.predict(Xt)
 ```
 Evaluate prediction result
+
 ```python
 from pecos.utils import smat_util
+
 # load test labels with shape=(Nt, L)
 Yt = XLinearModel.load_label_matrix("test/tst-data/xmc/xlinear/Yt.npz")
-metric = smat_util.Metrics.generate(Yt, Yt_pred, topk=10)
+metric = smat_util.MetricsMLabel.generate(Yt, Yt_pred, topk=10)
 print(metric)
 ```
 

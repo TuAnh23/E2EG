@@ -932,7 +932,7 @@ class CsrEnsembler(object):
 
         for param, pred in zip(param_set, pred_set):
             print("param: {}".format(param))
-            print(Metrics.generate(Ytrue, pred, topk=topk))
+            print(MetricsMLabel.generate(Ytrue, pred, topk=topk))
 
         if not isinstance(ens_method, list):
             ens_method = [ens_method]
@@ -940,10 +940,10 @@ class CsrEnsembler(object):
             ens = getattr(CsrEnsembler, ens_name)
             cur_pred = ens(*pred_set)
             print(f"==== {ens_name} ensemble results ====")
-            print(Metrics.generate(Ytrue, cur_pred, topk=topk))
+            print(MetricsMLabel.generate(Ytrue, cur_pred, topk=topk))
 
 
-class Metrics(collections.namedtuple("Metrics", ["prec", "recall"])):
+class MetricsMLabel(collections.namedtuple("Metrics", ["prec", "recall"])):
     """The metrics (precision, recall) for multi-label classification problems."""
 
     __slots__ = ()
@@ -991,3 +991,39 @@ class Metrics(collections.namedtuple("Metrics", ["prec", "recall"])):
         prec = total_matched / tY.shape[0] / np.arange(1, topk + 1)
         recall = recall / tY.shape[0]
         return cls(prec=prec, recall=recall)
+
+
+class MetricsMClass(collections.namedtuple("Metrics", ["acc"])):
+    """The metric (accuracy) for multi-class classification problems."""
+
+    __slots__ = ()
+
+    def __str__(self):
+        """Format printing"""
+
+        def fmt(key):
+            return "{:4.2f}".format(100 * getattr(self, key))
+
+        return "\n".join("{:7}= {}".format(key, fmt(key)) for key in self._fields)
+
+
+    @classmethod
+    def generate(cls, tY, pY):
+        """Compute the metrics with given prediction and ground truth.
+
+        Args:
+            tY (np.ndarray): ground truth class array
+            pY (np.ndarray): predicted class logits
+            topk (int, optional): only generate topk prediction. Default 10
+
+        Returns:
+            Metrics
+        """
+        assert isinstance(tY, np.ndarray), type(tY)
+        assert isinstance(pY, np.ndarray), type(pY)
+        assert tY.shape == pY.shape, "tY.shape = {}, pY.shape = {}".format(tY.shape, pY.shape)
+
+        score = tY == pY
+
+        acc = np.sum(score) / tY.shape[0]
+        return cls(acc=acc)

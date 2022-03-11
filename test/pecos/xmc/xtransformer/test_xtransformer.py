@@ -246,7 +246,7 @@ def test_xtransformer_python_api():
         pred_params=pred_params,
     )
     P = xtf.predict(trn_corpus, X_trn)
-    metric = smat_util.Metrics.generate(Y_trn, P, topk=10)
+    metric = smat_util.MetricsMLabel.generate(Y_trn, P, topk=10)
     std_output = "prec   = 100.00 100.00 66.67 50.00 40.00 33.33 28.57 25.00 22.22 20.00\nrecall = 41.67 83.33 83.33 83.33 83.33 83.33 83.33 83.33 83.33 83.33"
     assert str(metric) == std_output, f"{str(metric)} != {std_output}"
 

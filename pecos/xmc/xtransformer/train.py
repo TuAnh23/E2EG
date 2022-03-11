@@ -20,9 +20,9 @@ from pecos.utils.cluster_util import ClusterChain
 from pecos.utils.featurization.text.preprocess import Preprocessor
 from pecos.xmc import PostProcessor
 
-from .matcher import TransformerMatcher
-from .model import XTransformer
-from .module import MLProblemWithText
+from .matcher import TransformerMatcher, TransformerMultiTask
+from .model import XTransformer, XTransformerMultiTask
+from .module import MLProblemWithText, MLMultiTaskProblemWithText
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,13 +63,23 @@ def parse_arguments():
         help="path to the instance feature matrix (CSR matrix, nr_insts * nr_features)",
     )
     parser.add_argument(
-        "-y",
+        "-y-mlabel",
         "--trn-label-path",
         type=str,
         metavar="PATH",
         required=not skip_training,
         help="path to the training label matrix (CSR matrix, nr_insts * nr_labels)",
     )
+
+    parser.add_argument(
+        "-y-mclass",
+        "--trn-class-path",
+        type=str,
+        metavar="PATH",
+        default=None,
+        help="path to the training class array (np.ndarray, nr_insts)",
+    )
+
     parser.add_argument(
         "-m",
         "--model-dir",
@@ -96,12 +106,20 @@ def parse_arguments():
         help="path to the test instance feature matrix",
     )
     parser.add_argument(
-        "-yt",
+        "-yt-mlabel",
         "--tst-label-path",
         type=str,
         metavar="PATH",
         default="",
         help="path to the file of the test label matrix",
+    )
+    parser.add_argument(
+        "-yt-mclass",
+        "--tst-class-path",
+        type=str,
+        metavar="PATH",
+        default="",
+        help="path to the file of the test class array",
     )
     # ========= indexer parameters ============
     parser.add_argument(
@@ -187,7 +205,7 @@ def parse_arguments():
         type=str,
         metavar="PATH",
         default="",
-        help="path to load existing TransformerMatcher model from disk, overrides model-shortcut",
+        help="path to load existing TransformerMatcher/TransformerMultiTask model from disk, overrides model-shortcut",
     )
     # ========== ranker parameters =============
     parser.add_argument(
@@ -458,9 +476,17 @@ def do_train(args):
         args (argparse.Namespace): Command line arguments parsed by `parser.parse_args()`
     """
     params = dict()
+
+    if args.trn_class_path is not None and args.trn_label_path:
+        # This is a multi-task problem
+        model_type = XTransformerMultiTask
+    else:
+        # XMC problem
+        model_type = XTransformer
+
     if args.generate_params_skeleton:
-        params["train_params"] = XTransformer.TrainParams.from_dict({}, recursive=True).to_dict()
-        params["pred_params"] = XTransformer.PredParams.from_dict({}, recursive=True).to_dict()
+        params["train_params"] = model_type.TrainParams.from_dict({}, recursive=True).to_dict()
+        params["pred_params"] = model_type.PredParams.from_dict({}, recursive=True).to_dict()
         print(f"{json.dumps(params, indent=True)}")
         return
 
@@ -472,17 +498,17 @@ def do_train(args):
     pred_params = params.get("pred_params", None)
 
     if train_params is not None:
-        train_params = XTransformer.TrainParams.from_dict(train_params)
+        train_params = model_type.TrainParams.from_dict(train_params)
     else:
-        train_params = XTransformer.TrainParams.from_dict(
+        train_params = model_type.TrainParams.from_dict(
             {k: v for k, v in vars(args).items() if v is not None},
             recursive=True,
         )
 
     if pred_params is not None:
-        pred_params = XTransformer.PredParams.from_dict(pred_params)
+        pred_params = model_type.PredParams.from_dict(pred_params)
     else:
-        pred_params = XTransformer.PredParams.from_dict(
+        pred_params = model_type.PredParams.from_dict(
             {k: v for k, v in vars(args).items() if v is not None},
             recursive=True,
         )
@@ -501,8 +527,12 @@ def do_train(args):
             raise ValueError("trn-feat is required unless code-path or label-feat is provided.")
 
     # Load training labels
-    Y_trn = smat_util.load_matrix(args.trn_label_path, dtype=np.float32)
-    LOGGER.info("Loaded training label matrix with shape={}".format(Y_trn.shape))
+    Y_trn_mlabel = smat_util.load_matrix(args.trn_label_path, dtype=np.float32)
+    LOGGER.info("Loaded training label matrix with shape={}".format(Y_trn_mlabel.shape))
+
+    # Load training classes
+    Y_trn_mclass = np.load(args.trn_class_path)
+    LOGGER.info("Loaded training classes array with shape={}".format(Y_trn_mclass.shape))
 
     # Load test feature if given
     if args.tst_feat_path:
@@ -513,10 +543,17 @@ def do_train(args):
 
     # Load test labels if given
     if args.tst_label_path:
-        Y_tst = smat_util.load_matrix(args.tst_label_path, dtype=np.float32)
-        LOGGER.info("Loaded test label matrix with shape={}".format(Y_tst.shape))
+        Y_tst_mlabel = smat_util.load_matrix(args.tst_label_path, dtype=np.float32)
+        LOGGER.info("Loaded test label matrix with shape={}".format(Y_tst_mlabel.shape))
     else:
-        Y_tst = None
+        Y_tst_mlabel = None
+
+    # Load test classes if given
+    if args.tst_class_path:
+        Y_tst_mclass = smat_util.load_matrix(args.tst_class_path, dtype=np.float32)
+        LOGGER.info("Loaded test class matrix with shape={}".format(Y_tst_mclass.shape))
+    else:
+        Y_tst_mclass = None
 
     # Load training texts
     trn_corpus = Preprocessor.load_data_from_file(
@@ -555,13 +592,22 @@ def do_train(args):
                 )
             )
 
-    trn_prob = MLProblemWithText(trn_corpus, Y_trn, X_feat=X_trn)
-    if all(v is not None for v in [tst_corpus, Y_tst]):
-        val_prob = MLProblemWithText(tst_corpus, Y_tst, X_feat=X_tst)
+    if args.trn_class_path is not None and args.trn_label_path:
+        # This is a multi-task problem
+        trn_prob = MLMultiTaskProblemWithText(trn_corpus, Y_class=Y_trn_mclass, Y_label=Y_trn_mlabel, X_feat=X_trn)
+        if all(v is not None for v in [tst_corpus, Y_tst_mlabel]):
+            val_prob = MLMultiTaskProblemWithText(tst_corpus, Y_class=Y_tst_mclass, Y_label=Y_tst_mlabel, X_feat=X_tst)
+        else:
+            val_prob = None
     else:
-        val_prob = None
+        # XMC problem
+        trn_prob = MLProblemWithText(trn_corpus, Y_trn_mlabel, X_feat=X_trn)
+        if all(v is not None for v in [tst_corpus, Y_tst_mlabel]):
+            val_prob = MLProblemWithText(tst_corpus, Y_tst_mlabel, X_feat=X_tst)
+        else:
+            val_prob = None
 
-    xtf = XTransformer.train(
+    xtf = model_type.train(
         trn_prob,
         clustering=cluster_chain,
         val_prob=val_prob,
@@ -573,6 +619,8 @@ def do_train(args):
     )
 
     xtf.save(args.model_dir)
+
+
 
 
 if __name__ == "__main__":

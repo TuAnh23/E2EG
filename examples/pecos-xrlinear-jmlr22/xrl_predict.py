@@ -186,7 +186,7 @@ def do_predict(args):
     # Evaluate
     if args.label_path:
         Yt = XLinearModel.load_label_matrix(args.label_path)
-        metric = smat_util.Metrics.generate(Yt, Yt_pred, topk=10)
+        metric = smat_util.MetricsMLabel.generate(Yt, Yt_pred, topk=10)
         print("==== evaluation results ====")
         print(metric)
 

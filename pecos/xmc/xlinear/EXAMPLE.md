@@ -132,7 +132,8 @@ Y_pred = xlm.predict(X_tst)
 ```
 
 (4) evaluate precision/recall
+
 ```python
-metric = smat_util.Metrics.generate(Y_tst, Y_pred, topk=10)
+metric = smat_util.MetricsMLabel.generate(Y_tst, Y_pred, topk=10)
 print(metric)
 ```

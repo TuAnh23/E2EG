@@ -127,7 +127,7 @@ def do_predict(args):
         Yt_topk = smat_util.sorted_csr(Yt, only_topk=args.only_topk)
         # assuming prediction matrix is distance-based, so need 1-dist=similiarty
         Yt_pred.data = 1.0 - Yt_pred.data
-        metric = smat_util.Metrics.generate(Yt_topk, Yt_pred, topk=args.only_topk)
+        metric = smat_util.MetricsMLabel.generate(Yt_topk, Yt_pred, topk=args.only_topk)
         print(
             "Recall{}@{} {:.6f}%".format(args.only_topk, args.only_topk, 100.0 * metric.recall[-1])
         )

@@ -30,7 +30,7 @@ class MLProblemWithText(object):
     def __init__(self, X_text, Y, X_feat=None, C=None, M=None):
         self.X_text = X_text
 
-        self.Y = Y
+        self.Y_label = Y
         self.X_feat = X_feat
         self.C = C
         self.M = M
@@ -44,8 +44,8 @@ class MLProblemWithText(object):
     def type_check(self):
         if self.X_feat is not None and not isinstance(self.X_feat, (smat.csr_matrix, np.ndarray)):
             raise TypeError(f"Expect X to be csr_matrix or ndarray, got {type(self.X)}")
-        if not isinstance(self.Y, smat.csr_matrix):
-            raise TypeError(f"Expect Y to be csr_matrix, got {type(self.Y)}")
+        if not isinstance(self.Y_label, smat.csr_matrix):
+            raise TypeError(f"Expect Y to be csr_matrix, got {type(self.Y_label)}")
         if self.C is not None and not isinstance(self.C, smat.csc_matrix):
             raise TypeError(f"Expect C to be csc_matrix, got {type(self.C)}")
         if self.M is not None and not isinstance(self.M, smat.csr_matrix):
@@ -53,7 +53,7 @@ class MLProblemWithText(object):
 
     @property
     def nr_labels(self):
-        return self.Y.shape[1]
+        return self.Y_label.shape[1]
 
     @property
     def nr_features(self):
@@ -62,6 +62,60 @@ class MLProblemWithText(object):
     @property
     def nr_codes(self):
         return None if self.C is None else self.C.shape[1]
+
+
+class MLMultiTaskProblemWithText(object):
+    """Object that defines a ML-MultiTask-Problem with text input.
+    Containing the input text and X, Y_label, Y_class, C, M, M_pred matrices.
+
+        X_text (list of str or dict of tensors): instance text, len(text) = nr_inst
+                or dictionary of tokenized text (dict of torch.tensor)
+        Y_label (csr_matrix): training labels, shape = (nr_inst, nr_labels)
+        Y_class (ndarray): training classes, shape = (nr_inst)
+        X_feat (csr_matrix or ndarray): instance numerical features, shape = (nr_inst, nr_features)
+        C (csc_matrix, optional): clustering matrix, shape = (nr_labels, nr_codes)
+        M (csr_matrix, optional): matching matrix, shape = (nr_inst, nr_codes)
+                model will be trained only on its non-zero indices
+                its values will not be used.
+    """
+
+    def __init__(self, X_text, Y_label, Y_class, X_feat=None, C=None, M=None):
+        self.X_text = X_text
+
+        self.Y_label = Y_label
+        self.Y_class = Y_class
+        self.X_feat = X_feat
+        self.C = C
+        self.M = M
+
+        self.type_check()
+
+    @property
+    def is_tokenized(self):
+        return isinstance(self.X_text, dict)
+
+    def type_check(self):
+        if self.X_feat is not None and not isinstance(self.X_feat, (smat.csr_matrix, np.ndarray)):
+            raise TypeError(f"Expect X to be csr_matrix or ndarray, got {type(self.X)}")
+        if not isinstance(self.Y_label, smat.csr_matrix):
+            raise TypeError(f"Expect Y_label to be csr_matrix, got {type(self.Y_label)}")
+        if self.C is not None and not isinstance(self.C, smat.csc_matrix):
+            raise TypeError(f"Expect C to be csc_matrix, got {type(self.C)}")
+        if self.M is not None and not isinstance(self.M, smat.csr_matrix):
+            raise TypeError(f"Expect M to be csr_matrix, got {type(self.M)}")
+
+    @property
+    def nr_labels(self):
+        return self.Y_label.shape[1]
+
+    @property
+    def nr_features(self):
+        return None if self.X_feat is None else self.X_feat.shape[1]
+
+    @property
+    def nr_codes(self):
+        return None if self.C is None else self.C.shape[1]
+
 
 
 class XMCDataset(Dataset):
@@ -104,6 +158,61 @@ class XMCDataset(Dataset):
             return self.data[index] + (self.label_values[index],)
         else:
             return self.data[index]
+
+    def __len__(self):
+        return self.nr_inst
+
+    def refresh_labels(self, label_values=None, label_indices=None):
+        """Refresh label-values and label-indices from given tensors"""
+        self.label_values = label_values
+        self.label_indices = label_indices
+
+
+class MultiTaskDataset(Dataset):
+    """Dataset to hold feature, label and class tensors for multi-task training and prediction.
+
+    Args:
+        *features (tensors): feature tensors, required to have same first
+            dimension: nr_inst
+        class_value (tensor): class value with shape = (nr_inst) in multi-class classification
+        label_values (tensor or None): label values with shape = (nr_inst, num_active_labels) in multi-label classification
+        label_indices (tensor or None): label indices with shape = (nr_inst, num_active_labels) in multi-label classification
+
+    Return values depend on the label_values and label_indices:
+        if label_values is None and label_indices is not None:
+            data[i] = (feature[0][i], feature[1][i], ..., class_value[i], label_values[i], label_indices[i])
+        elif label_values is not None:
+            data[i] = (feature[0][i], feature[1][i], ..., class_value[i], label_values[i])
+        elif label_indices is not None:
+            data[i] = (feature[0][i], feature[1][i], ..., class_value[i], label_indices[i])
+        else:
+            data[i] = (feature[0][i], feature[1][i], class_value[i], ...)
+    """
+
+    def __init__(self, *features, class_value, label_values=None, label_indices=None):
+        self.nr_inst = features[0].size(0)
+        self.data = TensorDataset(*features)
+        self.class_value = class_value
+        if label_values is not None and label_values.size(0) != self.nr_inst:
+            raise ValueError("First dimension mismatch between features and label_values")
+        if label_indices is not None and label_indices.size(0) != self.nr_inst:
+            raise ValueError("First dimension mismatch between features and label_indices")
+
+        self.label_values = label_values
+        self.label_indices = label_indices
+
+    def classes(self):
+        return self.class_value
+
+    def __getitem__(self, index):
+        if self.label_values is not None and self.label_indices is not None:
+            return self.data[index] + (self.class_value[index], self.label_values[index], self.label_indices[index])
+        elif self.label_indices is not None:
+            return self.data[index] + (self.class_value[index], self.label_indices[index],)
+        elif self.label_values is not None:
+            return self.data[index] + (self.class_value[index], self.label_values[index],)
+        else:
+            return self.data[index] + (self.class_value[index],)
 
     def __len__(self):
         return self.nr_inst

@@ -61,7 +61,7 @@ def do_evaluation(args):
 
     Y_true = smat_util.load_matrix(args.truth_path).tocsr()
     Y_pred = smat_util.load_matrix(args.pred_path).tocsr()
-    metric = smat_util.Metrics.generate(Y_true, Y_pred, topk=args.topk)
+    metric = smat_util.MetricsMLabel.generate(Y_true, Y_pred, topk=args.topk)
     print("==== evaluation results ====")
     print(metric)
 

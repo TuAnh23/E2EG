@@ -108,6 +108,12 @@ python -u baseline_models/bert_classifier.py \
 ```
 
 ### Proposed models
+Note: in this repository, we make a clear distinction between `multi-label` classification tasks and `multi-class` classification tasks (whereas in real-life, the term "label" and "class" might be used interchangeably)
+
+- `Multi-class` classification: each input will have only one output class. This is the case of the main node classification task.
+- `Multi-label` classification: each input can have multiple output labels. This is the case of the auxiliary neighborhood prediction task.
+
+The proposed model learns both the `Multi-class` classification task and the `Multi-label` classification task, and backpropagate the loss in tandem for both tasks
 ```bash
 # Download data
 cd data/proc_data_multi_task
@@ -117,4 +123,7 @@ cd ../../
 # Process data
 source activate giant-xrt
 bash proc_data_multi_task.sh ${dataset}
+# Train model
+data_dir=data/proc_data_multi_task/${dataset}
+bash multi_task_train.sh ${data_dir}
 ```

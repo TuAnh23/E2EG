@@ -245,7 +245,7 @@ def do_analyze(args):
     truth = truth.tocsr()
     pred = pred.tocsr()
     print("Calculating metrics")
-    metric = smat_util.Metrics.generate(truth, pred, topk=10)
+    metric = smat_util.MetricsMLabel.generate(truth, pred, topk=10)
     print(metric)
     print("Average #inner prod: ", avg_inner_prod)
 

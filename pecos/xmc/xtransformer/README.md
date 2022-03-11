@@ -89,8 +89,9 @@ Predict
 P = xtf.predict(text, X)
 ```
 Evaluate prediction result
+
 ```python
-metric = smat_util.Metrics.generate(Y, P, topk=10)
+metric = smat_util.MetricsMLabel.generate(Y, P, topk=10)
 print(metric)
 ```
 
