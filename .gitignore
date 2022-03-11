@@ -6,7 +6,7 @@ libpecos.egg-info/*
 *.pickle
 */.ipynb_checkpoints/*
 
-# Ignore all files in data/ except for the description and script files
+# Ignore all files in data/ except for the description, script files, and params files
 data/*
 !data/README.md
 !data/proc_data_multi_task/
@@ -14,6 +14,7 @@ data/*
 data/proc_data_multi_task/*
 !data/proc_data_multi_task/download_data.sh
 !data/proc_data_multi_task/vect_config.json
+!data/proc_data_multi_task/params*
 
 # Ignore all files in experiments/ except for the description file
 experiments/*

@@ -1,5 +1,6 @@
 #================= inputs =====================
 data_dir=$1                             # e.g., .data/proc_data_multi_task/ogbn-arxiv
+params_path=$2
 if [ -z ${data_dir} ] || [ ! -d ${data_dir} ]; then
     echo "DATA_DIR does not exist: ${data_dir}"
     exit
@@ -9,7 +10,6 @@ Y_main_path=${data_dir}/Y_main.trn.npy                # training class matrix
 X_txt_path=${data_dir}/X.trn.txt                      # training text
 X_npz_path=${data_dir}/X.trn.tfidf.npz                # training tfidf feature
 X_pt_path=${data_dir}/X.trn.pt                        # save trn tensors here
-params_path=${data_dir}/params.json                   # train/predict hyper-parameters in json file
 
 #================== outputs ===================
 model_dir=models/multi_task_models
