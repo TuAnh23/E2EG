@@ -616,11 +616,10 @@ def do_train(args):
         beam_size=args.beam_size,
         steps_scale=args.steps_scale,
         label_feat=label_feat,
+        model_dir=args.model_dir,
     )
 
-    xtf.save(args.model_dir)
-
-
+    xtf.save(f"{args.model_dir}/final")
 
 
 if __name__ == "__main__":

@@ -219,6 +219,7 @@ class XTransformer(pecos.BaseClass):
         val_prob=None,
         train_params=None,
         pred_params=None,
+        model_dir=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -831,6 +832,15 @@ class XTransformerMultiTask(pecos.BaseClass):
         else:
             return self.text_encoder.nr_labels
 
+    @property
+    def nr_classes(self):
+        """Get the number of classes
+
+        Returns:
+            nr_classes (int): Number of classes.
+        """
+        return self.text_encoder.nr_classes
+
     def save(self, save_dir):
         """Save the X-Transformer model to file.
 
@@ -845,6 +855,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             "model": self.__class__.__name__,
             "depth": self.depth,
             "nr_labels": self.nr_labels,
+            "nr_classes": int(self.nr_classes),
         }
         params = self.append_meta(params)
         param_dir = os.path.join(save_dir, "param.json")
@@ -869,7 +880,9 @@ class XTransformerMultiTask(pecos.BaseClass):
         """
         if not os.path.isdir(load_dir):
             raise ValueError(f"load dir does not exist at: {load_dir}")
-        text_encoder = TransformerMultiTask.load(os.path.join(load_dir, "text_encoder"))
+        with open(os.path.join(load_dir, "text_encoder/param.json")) as json_file:
+            num_classes = json.load(json_file)['nr_classes']
+        text_encoder = TransformerMultiTask.load(os.path.join(load_dir, "text_encoder"), num_classes=num_classes)
         try:
             concat_model = XLinearModel.load(os.path.join(load_dir, "concat_model"))
             LOGGER.info("Full model loaded from {}".format(load_dir))
@@ -896,6 +909,7 @@ class XTransformerMultiTask(pecos.BaseClass):
         val_prob=None,
         train_params=None,
         pred_params=None,
+        model_dir=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1148,6 +1162,8 @@ class XTransformerMultiTask(pecos.BaseClass):
                     return_train_embeddings=return_train_embeddings,
                     saved_trn_pt=saved_trn_pt,
                     saved_val_pt=saved_val_pt,
+                    finetune_round_th=i,
+                    model_dir=model_dir,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred_label"]
@@ -1256,8 +1272,6 @@ class XTransformerMultiTask(pecos.BaseClass):
         Returns:
             pred_csr (csr_matrix): instance to label prediction (csr_matrix, nr_insts * nr_labels)
         """
-        if not isinstance(self.concat_model, XLinearModel):
-            raise TypeError("concat_model is not present in current XTransformer model!")
 
         saved_pt = kwargs.get("saved_pt", None)
         batch_size = kwargs.get("batch_size", 8)
@@ -1292,32 +1306,17 @@ class XTransformerMultiTask(pecos.BaseClass):
                 max_length=encoder_pred_params.truncate_length,
             )
 
-        pred_csr = None
         self.text_encoder.to_device(device, n_gpu=n_gpu)
-        _, embeddings = self.text_encoder.predict(
+        pred_csr_mlabel, pred_mclass, embeddings = self.text_encoder.predict(
             text_tensors,
             pred_params=encoder_pred_params,
             batch_size=batch_size * max(1, n_gpu),
             batch_gen_workers=batch_gen_workers,
             max_pred_chunk=max_pred_chunk,
-            only_embeddings=True,
+            only_embeddings=False,
         )
 
-        cat_embeddings = TransformerMultiTask.concat_features(
-            X_feat,
-            embeddings,
-            normalize_emb=True,
-        )
-        LOGGER.debug(
-            "Constructed instance feature matrix with shape={}".format(cat_embeddings.shape)
-        )
-        pred_csr = self.concat_model.predict(
-            cat_embeddings,
-            pred_params=None if pred_params is None else pred_params.ranker_params,
-            max_pred_chunk=max_pred_chunk,
-            threads=kwargs.get("threads", -1),
-        )
-        return pred_csr
+        return pred_csr_mlabel, pred_mclass
 
     def encode(
         self,

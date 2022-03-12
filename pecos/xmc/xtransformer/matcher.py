@@ -1777,6 +1777,11 @@ class TransformerMultiTask(pecos.BaseClass):
         return self.text_model.num_labels
 
     @property
+    def nr_classes(self):
+        """Get the number of classes"""
+        return self.text_encoder.num_classes
+
+    @property
     def model_type(self):
         """Get the encoder model type"""
         if hasattr(self.text_encoder, "module"):
@@ -1800,6 +1805,7 @@ class TransformerMultiTask(pecos.BaseClass):
             "model": self.__class__.__name__,
             "text_encoder": encoder_to_save.__class__.__name__,
             "nr_labels": self.nr_labels,
+            "nr_classes": int(self.nr_classes),
             "nr_features": self.nr_features,
             "nr_codes": self.nr_codes,
             "train_params": self.train_params.to_dict(),
@@ -2162,6 +2168,7 @@ class TransformerMultiTask(pecos.BaseClass):
 
         Returns:
             label_pred (csr_matrix): label prediction logits, shape = (nr_inst, nr_labels)
+            class_pred (ndarray): class prediction logits, shape = (nr_inst,)
             embeddings (ndarray): array of instance embeddings shape = (nr_inst, hidden_dim)
         """
         if pred_params is None:
@@ -2213,6 +2220,7 @@ class TransformerMultiTask(pecos.BaseClass):
             else:
                 # only_embeddings case
                 label_pred = None
+                class_pred = None
             embeddings = np.vstack(embedding_chunks)
         return label_pred, class_pred, embeddings
 
@@ -2595,7 +2603,8 @@ class TransformerMultiTask(pecos.BaseClass):
         tr_loss_mlabel, tr_loss_mclass, logging_loss_mlabel, logging_loss_mclass = 0.0, 0.0, 0.0, 0.0
         total_train_time, logging_elapsed = 0.0, 0.0
         best_matcher_prec = -1
-        avg_matcher_prec = 0
+        avg_matcher_prec_mlabel = 0
+        acc_mclass = 0
         save_cur_model = False
         no_improve_cnt = 0
 
@@ -2709,6 +2718,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                 # compute loss and prediction on test set
                                 val_pred_label, val_pred_class, _ = self.predict(
                                     val_prob.X_text,
+                                    Y_class=val_prob.Y_class,
                                     csr_codes=valid_M,
                                     batch_size=train_params.batch_size,
                                     batch_gen_workers=train_params.batch_gen_workers,
@@ -2729,7 +2739,8 @@ class TransformerMultiTask(pecos.BaseClass):
                                     val_pred_label,
                                     topk=pred_params.only_topk,
                                 )
-                                val_metrics_mclass = smat_util.MetricsMClass.generate(val_prob.Y_class, val_pred_class)
+                                val_metrics_mclass = smat_util.MetricsMClass.generate(val_prob.Y_class,
+                                                                                      val_pred_class.argmax(axis=1))
 
                                 LOGGER.info(
                                     "| {} mlabel-test-prec {}".format(
@@ -2751,9 +2762,10 @@ class TransformerMultiTask(pecos.BaseClass):
                                     "| mclass-test-acc {:4.2f}".format(100 * val_metrics_mclass.acc),
                                 )
 
-                            avg_matcher_prec = np.mean(val_metrics.prec)
+                            avg_matcher_prec_mlabel = np.mean(val_metrics.prec)
+                            acc_mclass = val_metrics_mclass.acc
                             # save the model with highest val precision
-                            save_cur_model = avg_matcher_prec > best_matcher_prec
+                            save_cur_model = avg_matcher_prec_mlabel > best_matcher_prec
                         else:
                             # if val set not given, always save
                             save_cur_model = True
@@ -2761,13 +2773,14 @@ class TransformerMultiTask(pecos.BaseClass):
                         if save_cur_model:
                             no_improve_cnt = 0
                             LOGGER.info(
-                                "| **** saving model (avg_prec={}) to {} at global_step {} ****".format(
-                                    100 * avg_matcher_prec,
+                                "| **** saving model (avg_prec_mlabel={:4.4f}, acc_mclass={:4.4f}) to {} at global_step {} ****".format(
+                                    100 * avg_matcher_prec_mlabel,
+                                    100 * acc_mclass,
                                     train_params.checkpoint_dir,
                                     global_step,
                                 )
                             )
-                            best_matcher_prec = avg_matcher_prec
+                            best_matcher_prec = avg_matcher_prec_mlabel
                             self.save(train_params.checkpoint_dir)
                         else:
                             no_improve_cnt += 1
@@ -2793,6 +2806,8 @@ class TransformerMultiTask(pecos.BaseClass):
         val_csr_codes=None,
         train_params=None,
         pred_params=None,
+        finetune_round_th="",
+        model_dir="",
         **kwargs,
     ):
         """Train the transformer matcher
@@ -2840,13 +2855,14 @@ class TransformerMultiTask(pecos.BaseClass):
         if prob.X_feat is None:
             pred_params.ensemble_method = "transformer-only"
 
-        # save to a temp dir if not given
         if not train_params.checkpoint_dir:
-            temp_dir = tempfile.TemporaryDirectory()
-            train_params.checkpoint_dir = temp_dir.name
+            # save to a temp dir if not given
+            # temp_dir = tempfile.TemporaryDirectory()
+            # train_params.checkpoint_dir = temp_dir.name
+            train_params.checkpoint_dir = f"{model_dir}/round{finetune_round_th}"
 
         if train_params.init_model_dir:
-            matcher = cls.load(train_params.init_model_dir)
+            matcher = cls.load(train_params.init_model_dir, num_classes=prob.Y_class.max() + 1)
             LOGGER.info("Loaded model from {}.".format(train_params.init_model_dir))
             if prob.Y_label.shape[1] != matcher.nr_labels:
                 LOGGER.warning(
@@ -3014,7 +3030,7 @@ class TransformerMultiTask(pecos.BaseClass):
             val_type = "man" if val_csr_codes is not None else "all"
             val_metrics_mlabel = smat_util.MetricsMLabel.generate(val_prob.Y_label, P_label_val,
                                                                   topk=pred_params.only_topk)
-            val_metrics_mclass = smat_util.MetricsMClass.generate(val_prob.Y_class, P_class_val)
+            val_metrics_mclass = smat_util.MetricsMClass.generate(val_prob.Y_class, P_class_val.argmax(axis=1))
             avr_val_beam = (
                 1 if val_csr_codes is None else val_csr_codes.nnz / val_csr_codes.shape[0]
             )

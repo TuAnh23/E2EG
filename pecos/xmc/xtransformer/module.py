@@ -211,8 +211,10 @@ class MultiTaskDataset(Dataset):
             return self.data[index] + (self.class_value[index], self.label_indices[index],)
         elif self.label_values is not None:
             return self.data[index] + (self.class_value[index], self.label_values[index],)
-        else:
+        elif self.class_value is not None:
             return self.data[index] + (self.class_value[index],)
+        else:
+            return self.data[index]
 
     def __len__(self):
         return self.nr_inst

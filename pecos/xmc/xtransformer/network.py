@@ -283,10 +283,11 @@ class BertForMultiTask(BertPreTrainedModel):
     def __init__(self, config, num_classes):
         super(BertForMultiTask, self).__init__(config)
         self.num_labels = config.num_labels  # Number of labels for multi-label XMC
+        self.num_classes = num_classes
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.linear = nn.Linear(768, num_classes)  # For multi-class classification
+        self.linear = nn.Linear(768, self.num_classes)  # For multi-class classification
         self.relu = nn.ReLU()  # For multi-class classification
 
         self.init_weights()

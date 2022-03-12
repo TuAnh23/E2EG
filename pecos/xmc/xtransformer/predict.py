@@ -16,7 +16,7 @@ from pecos.utils import cli, logging_util, smat_util, torch_util
 from pecos.utils.featurization.text.preprocess import Preprocessor
 from pecos.xmc import PostProcessor
 
-from .model import XTransformer
+from .model import XTransformer, XTransformerMultiTask
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,11 +50,24 @@ def parse_arguments():
     )
     parser.add_argument(
         "-o",
-        "--save-pred-path",
+        "--save-pred-path-mlabel",
         type=str,
         required=True,
         metavar="PATH",
-        help="The path where the model predictions will be written.",
+        help="The path where the model predictions on XMC problem will be written.",
+    )
+
+    parser.add_argument(
+        "--save-pred-path-mclass",
+        type=str,
+        metavar="PATH",
+        help="The path where the model predictions on multi-class problem will be written.",
+    )
+
+    parser.add_argument(
+        "--multi-task",
+        action='store_true',
+        help="Whether the model is multi-task",
     )
     # ======= Other parameters ========
     parser.add_argument(
@@ -137,12 +150,18 @@ def do_predict(args):
     Args:
         args (argparse.Namespace): Command line arguments parsed by `parser.parse_args()`
     """
-    if os.path.isdir(args.save_pred_path):
+    if os.path.isdir(args.save_pred_path_mlabel):
+        args.save_pred_path = os.path.join(args.save_pred_path, "P.npz")
+
+    if os.path.isdir(args.save_pred_path_mclass):
         args.save_pred_path = os.path.join(args.save_pred_path, "P.npz")
 
     torch_util.set_seed(args.seed)
 
-    xtf = XTransformer.load(args.model_folder)
+    if args.multi_task:
+        xtf = XTransformerMultiTask.load(args.model_folder)
+    else:
+        xtf = XTransformer.load(args.model_folder)
 
     # load instance feature and text
     if args.feat_path:
@@ -153,20 +172,35 @@ def do_predict(args):
         "corpus"
     ]
 
-    P_matrix = xtf.predict(
-        X_text,
-        X_feat=X_feat,
-        batch_size=args.batch_size,
-        batch_gen_workers=args.batch_gen_workers,
-        use_gpu=args.use_gpu,
-        beam_size=args.beam_size,
-        only_topk=args.only_topk,
-        post_processor=args.post_processor,
-        max_pred_chunk=args.max_pred_chunk,
-        threads=args.threads,
-    )
-
-    smat_util.save_matrix(args.save_pred_path, P_matrix)
+    if args.multi_task:
+        P_matrix_mlabel, P_mclass = xtf.predict(
+            X_text,
+            X_feat=X_feat,
+            batch_size=args.batch_size,
+            batch_gen_workers=args.batch_gen_workers,
+            use_gpu=args.use_gpu,
+            beam_size=args.beam_size,
+            only_topk=args.only_topk,
+            post_processor=args.post_processor,
+            max_pred_chunk=args.max_pred_chunk,
+            threads=args.threads,
+        )
+        smat_util.save_matrix(args.save_pred_path_mlabel, P_matrix_mlabel)
+        smat_util.save_matrix(args.save_pred_path_mclass, P_mclass)
+    else:
+        P_matrix_mlabel = xtf.predict(
+            X_text,
+            X_feat=X_feat,
+            batch_size=args.batch_size,
+            batch_gen_workers=args.batch_gen_workers,
+            use_gpu=args.use_gpu,
+            beam_size=args.beam_size,
+            only_topk=args.only_topk,
+            post_processor=args.post_processor,
+            max_pred_chunk=args.max_pred_chunk,
+            threads=args.threads,
+        )
+        smat_util.save_matrix(args.save_pred_path_mlabel, P_matrix_mlabel)
 
 
 if __name__ == "__main__":
