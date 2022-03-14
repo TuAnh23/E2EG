@@ -1116,7 +1116,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     cur_val_prob = MLMultiTaskProblemWithText(
                         val_prob.X_text,
                         val_YC_list[i],
-                        Y_class=prob.Y_class,
+                        Y_class=val_prob.Y_class,
                         X_feat=None if i == nr_transformers - 1 else val_prob.X_feat,
                         C=clustering[i],
                         M=val_M,
