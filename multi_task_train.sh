@@ -1,6 +1,8 @@
 #================= inputs =====================
 data_dir=$1                             # e.g., .data/proc_data_multi_task/ogbn-arxiv
-params_path=$2
+model_dir=$2
+experiment_dir=$3
+params_path=$4
 if [ -z ${data_dir} ] || [ ! -d ${data_dir} ]; then
     echo "DATA_DIR does not exist: ${data_dir}"
     exit
@@ -25,14 +27,16 @@ X_test_npz_path=${data_dir}/X.test.tfidf.npz                # test tfidf feature
 X_test_pt_path=${data_dir}/X.test.pt                        # save test tensors here
 
 #================== outputs ===================
-model_dir=models/multi_task_models
-experiment_dir=experiments/multi_task_models
 mkdir -p ${experiment_dir}
 mkdir -p ${model_dir}
-TMPDIR=${model_dir}/tmp
-mkdir -p ${TMPDIR}
-export TMPDIR=${model_dir}/tmp
-
+if [[ -z "${TMPDIR}" ]]; then
+  # TMPDIR environment variable is not yet defined, so we define one
+  TMPDIR=${model_dir}/tmp
+  mkdir -p ${TMPDIR}
+  export TMPDIR=${model_dir}/tmp
+else
+  echo "TMPDIR is "$TMPDIR""
+fi
 #==================== train ===================
 python -m pecos.xmc.xtransformer.train \
     --trn-text-path ${X_trn_txt_path} \
