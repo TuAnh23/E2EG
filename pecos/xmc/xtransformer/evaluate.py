@@ -36,13 +36,6 @@ def parse_arguments():
         help="Path to the pred class target.",
     )
     parser.add_argument(
-        "--save-score-path",
-        type=str,
-        required=True,
-        metavar="PATH",
-        help="The path where the scores will be written.",
-    )
-    parser.add_argument(
         "--verbose-level",
         type=int,
         choices=logging_util.log_levels.keys(),
@@ -66,8 +59,7 @@ def do_evaluate(args):
 
     test_metrics_mclass = smat_util.MetricsMClass.generate(y_class_true, y_class_pred.argmax(axis=1))
 
-    with open(args.save_score_path, 'w') as f:
-        f.write(f"Multi-class score: \n Accuracy: {test_metrics_mclass.acc}\n")
+    print(f"\tMulti-class accuracy: {test_metrics_mclass.acc}\n")
 
 
 if __name__ == "__main__":

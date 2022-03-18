@@ -51,18 +51,41 @@ python -m pecos.xmc.xtransformer.train \
     --params-path ${params_path} \
     --verbose-level 3 \
     |& tee ${experiment_dir}/train.log
+grep -o "saving model.*" ${experiment_dir}/train.log >> ${experiment_dir}/val_performance_per_round.log
+grep -o "mclass-test-acc.*" ${experiment_dir}/train.log | tail -1 >> ${experiment_dir}/val_performance_per_round.log
 
 #==================== test ===================
-python -m pecos.xmc.xtransformer.predict \
+# Restructure the saved models
+for dir_path in ${model_dir}/round* ${model_dir}/final
+do
+  dir="$(basename -- ${dir_path})"
+  if [ -d ${model_dir}/${dir}/text_tokenizer ]; then
+    mkdir -p ${model_dir}/${dir}_tmp/text_encoder
+    mv ${model_dir}/${dir}/* ${model_dir}/${dir}_tmp/text_encoder
+    rm -r ${model_dir}/${dir}
+    mv ${model_dir}/${dir}_tmp ${model_dir}/${dir}
+  fi
+done
+# Perform tests using every model from each fine-tuning round
+for dir_path in ${model_dir}/round* ${model_dir}/final
+do
+	dir="$(basename -- ${dir_path})"
+	python -m pecos.xmc.xtransformer.predict \
     --feat-path ${X_test_npz_path} \
     --text-path ${X_test_txt_path} \
-    --model-folder ${model_dir}/final \
-    --save-pred-path-mlabel ${experiment_dir}/prediction_mlabel \
-    --save-pred-path-mclass ${experiment_dir}/prediction_mclass \
+    --model-folder ${model_dir}/${dir} \
+    --save-pred-path-mlabel ${experiment_dir}/${dir}_prediction_mlabel \
+    --save-pred-path-mclass ${experiment_dir}/${dir}_prediction_mclass \
     --multi-task
+done
 
 #==================== eval ===================
-python -m pecos.xmc.xtransformer.evaluate \
+for dir_path in ${model_dir}/round* ${model_dir}/final
+do
+	dir="$(basename -- ${dir_path})"
+	echo ${dir} | tee -a ${experiment_dir}/test_scores.txt
+	python -m pecos.xmc.xtransformer.evaluate \
     --y-class-true ${Y_test_main_path} \
-    --y-class-pred ${experiment_dir}/prediction_mclass \
-    --save-score-path ${experiment_dir}/scores.txt
+    --y-class-pred ${experiment_dir}/${dir}_prediction_mclass \
+    | tee -a ${experiment_dir}/test_scores.txt
+done
