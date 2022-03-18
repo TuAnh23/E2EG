@@ -36,7 +36,7 @@ def main():
         edge_index = to_undirected(edge_index)
     # Filtering nodes whose number of edges >= max_degree
     Degree = degree(edge_index[0])
-    Filtered_idx = torch.where(Degree < args.max_deg)[0]  # Add [:x] to the end to create a tiny dataset with x nodes
+    Filtered_idx = torch.where(Degree < args.max_deg)[0]
     print('Number of original nodes:{}'.format(data.x.shape[0]))
     print('Number of filtered nodes:{}'.format(len(Filtered_idx)))
 

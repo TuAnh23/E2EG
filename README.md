@@ -128,5 +128,5 @@ data_dir=data/proc_data_multi_task/${dataset}
 model_dir=models/multi_task_models
 experiment_dir=experiments/multi_task_models
 params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
-bash multi_task_train.sh ${data_dir} ${params_path}
+bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${params_path}
 ```

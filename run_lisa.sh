@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
-#SBATCH --time=04-00:00:00
+#SBATCH --time=00-08:00:00
 #SBATCH --mem=48000M
 #SBATCH --output=slurm_output_%A.out
 
@@ -38,4 +38,4 @@ experiment_dir=${tmp_dir}/experiments/multi_task_models
 trap 'cp -r ${model_dir} $HOME/UvA_Thesis_pecosEXT/models; cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments;' EXIT
 # Run train-val-test pipeline
 params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
-bash multi_task_train.sh ${data_dir} ${model_dir} ${experiment_dir} ${params_path}
+bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${params_path}
