@@ -465,6 +465,12 @@ def parse_arguments():
         metavar="INT",
         help=f"the verbose level, {', '.join([str(k) + ' for ' + logging.getLevelName(v) for k, v in logging_util.log_levels.items()])}. Default 2",
     )
+    parser.add_argument(
+        "--wandb-username",
+        type=str,
+        default=None,
+        help="Username if want to log results to wandb. If not passed, do not use wandb",
+    )
 
     return parser
 
@@ -475,6 +481,12 @@ def do_train(args):
     Args:
         args (argparse.Namespace): Command line arguments parsed by `parser.parse_args()`
     """
+
+    if args.wandb_username is not None:
+        import wandb
+        wandb.init(project="UvA Thesis", entity=args.wandb_username, config={"seed": args.seed})
+        wandb.run.name = args.model_dir.split('/')[-2] + f"_seed{args.seed}"
+
     params = dict()
 
     if args.trn_class_path is not None and args.trn_label_path:

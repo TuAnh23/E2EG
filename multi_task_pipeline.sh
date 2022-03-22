@@ -67,9 +67,9 @@ do
       --params-path ${params_path} \
       --verbose-level 3 \
       --seed ${seed} \
+      --wandb-username tuanh \
       |& tee ${experiment_dir}/run${seed}/train.log
-  grep -o "saving model.*" ${experiment_dir}/run${seed}/train.log >> ${experiment_dir}/run${seed}/val_performance_per_round.log
-  grep -o "mclass-test-acc.*" ${experiment_dir}/run${seed}/train.log | tail -1 >> ${experiment_dir}/run${seed}/val_performance_per_round.log
+  grep -o "Final performance.*" ${experiment_dir}/run${seed}/train.log >> ${experiment_dir}/run${seed}/val_performance_per_round.log
 
   #==================== test ===================
   # Restructure the saved models

@@ -2442,7 +2442,7 @@ class TransformerMultiTask(pecos.BaseClass):
             raise TypeError(f"Expected CSR or ndarray, got {type(X_feat)}")
         return X_cat
 
-    def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None):
+    def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None, finetune_round_th=None):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2602,9 +2602,9 @@ class TransformerMultiTask(pecos.BaseClass):
         global_step = 0
         tr_loss_mlabel, tr_loss_mclass, logging_loss_mlabel, logging_loss_mclass = 0.0, 0.0, 0.0, 0.0
         total_train_time, logging_elapsed = 0.0, 0.0
-        best_matcher_prec = -1
-        avg_matcher_prec_mlabel = 0
-        acc_mclass = 0
+        best_matcher_acc = -1
+        avg_matcher_val_prec_mlabel = 0
+        val_acc_mclass = 0
         save_cur_model = False
         no_improve_cnt = 0
 
@@ -2701,11 +2701,21 @@ class TransformerMultiTask(pecos.BaseClass):
                                 scheduler.get_last_lr()[0],
                             )
                         )
+                        try:
+                            import wandb
+                            wandb.log({f"train_loss_mlabel_round{finetune_round_th}": cur_loss_mlabel,
+                                       f"train_loss_mclass_round{finetune_round_th}": cur_loss_mclass,
+                                       f"learning_rate_round{finetune_round_th}": scheduler.get_last_lr()[0],
+                                       f"global_step_round{finetune_round_th}": global_step})
+                            wandb.watch(self.text_encoder)
+                        except:
+                            pass
                         logging_loss_mlabel = tr_loss_mlabel
                         logging_loss_mclass = tr_loss_mclass
                         logging_elapsed = 0
 
                     if train_params.save_steps > 0 and global_step % train_params.save_steps == 0:
+                        # Evaluate on validation set
                         if val_prob is not None:
                             if val_prob.M is None:
                                 test_combos = zip(["all"], [None])
@@ -2715,7 +2725,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                 )
                             for val_type, valid_M in test_combos:
                                 avr_beam = 1 if valid_M is None else valid_M.nnz / valid_M.shape[0]
-                                # compute loss and prediction on test set
+                                # compute prediction on validation set
                                 val_pred_label, val_pred_class, _ = self.predict(
                                     val_prob.X_text,
                                     Y_class=val_prob.Y_class,
@@ -2733,8 +2743,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                         avr_beam,
                                     )
                                 )
-                                # compute precision on test set
-                                val_metrics = smat_util.MetricsMLabel.generate(
+                                val_metrics_mlabel = smat_util.MetricsMLabel.generate(
                                     val_prob.Y_label,
                                     val_pred_label,
                                     topk=pred_params.only_topk,
@@ -2746,7 +2755,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                     "| {} mlabel-test-prec {}".format(
                                         val_type,
                                         " ".join(
-                                            "{:4.2f}".format(100 * v) for v in val_metrics.prec
+                                            "{:4.2f}".format(100 * v) for v in val_metrics_mlabel.prec
                                         ),
                                     )
                                 )
@@ -2754,7 +2763,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                     "| {} mlabel-test-recl {}".format(
                                         val_type,
                                         " ".join(
-                                            "{:4.2f}".format(100 * v) for v in val_metrics.recall
+                                            "{:4.2f}".format(100 * v) for v in val_metrics_mlabel.recall
                                         ),
                                     )
                                 )
@@ -2762,10 +2771,11 @@ class TransformerMultiTask(pecos.BaseClass):
                                     "| mclass-test-acc {:4.2f}".format(100 * val_metrics_mclass.acc),
                                 )
 
-                            avg_matcher_prec_mlabel = np.mean(val_metrics.prec)
-                            acc_mclass = val_metrics_mclass.acc
-                            # save the model with highest val precision
-                            save_cur_model = avg_matcher_prec_mlabel > best_matcher_prec
+                            avg_matcher_val_prec_mlabel = np.mean(val_metrics_mlabel.prec)
+                            val_acc_mclass = val_metrics_mclass.acc
+
+                            # save the model with highest val accuracy on the multi-class classification task
+                            save_cur_model = val_acc_mclass > best_matcher_acc
                         else:
                             # if val set not given, always save
                             save_cur_model = True
@@ -2773,14 +2783,14 @@ class TransformerMultiTask(pecos.BaseClass):
                         if save_cur_model:
                             no_improve_cnt = 0
                             LOGGER.info(
-                                "| **** saving model (avg_prec_mlabel={:4.4f}, acc_mclass={:4.4f}) to {} at global_step {} ****".format(
-                                    100 * avg_matcher_prec_mlabel,
-                                    100 * acc_mclass,
+                                "| **** saving model (avg_val_prec_mlabel={:4.4f}, val_acc_mclass={:4.4f}) to {} at global_step {} ****".format(
+                                    100 * avg_matcher_val_prec_mlabel,
+                                    100 * val_acc_mclass,
                                     train_params.checkpoint_dir,
                                     global_step,
                                 )
                             )
-                            best_matcher_prec = avg_matcher_prec_mlabel
+                            best_matcher_acc = val_acc_mclass
                             self.save(train_params.checkpoint_dir)
                         else:
                             no_improve_cnt += 1
@@ -2952,7 +2962,8 @@ class TransformerMultiTask(pecos.BaseClass):
         # train the matcher
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:
             LOGGER.info("Start fine-tuning transformer matcher...")
-            matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes)
+            matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes,
+                                      finetune_round_th=finetune_round_th)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
@@ -3026,7 +3037,32 @@ class TransformerMultiTask(pecos.BaseClass):
                 batch_gen_workers=train_params.batch_gen_workers,
             )
             LOGGER.info("*************** Final Evaluation ***************")
-            # compute precision on test set
+            # compute performance on train set
+            train_type = "man" if csr_codes is not None else "all"
+            train_metrics_mlabel = smat_util.MetricsMLabel.generate(prob.Y_label, P_label_trn,
+                                                                    topk=pred_params.only_topk)
+            train_metrics_mclass = smat_util.MetricsMClass.generate(prob.Y_class, P_class_trn.argmax(axis=1))
+            avr_train_beam = (
+                1 if csr_codes is None else csr_codes.nnz / csr_codes.shape[0]
+            )
+            LOGGER.debug("avr_beam={}".format(avr_train_beam))
+            LOGGER.info(
+                "| {} mlabel-train-prec {}".format(
+                    train_type,
+                    " ".join("{:4.2f}".format(100 * v) for v in train_metrics_mlabel.prec),
+                )
+            )
+            LOGGER.info(
+                "| {} mlabel-train-recl {}".format(
+                    train_type,
+                    " ".join("{:4.2f}".format(100 * v) for v in train_metrics_mlabel.recall),
+                )
+            )
+            LOGGER.info(
+                "| mclass-train-acc {:4.2f}".format(100 * train_metrics_mclass.acc),
+            )
+
+            # compute performance on validation set
             val_type = "man" if val_csr_codes is not None else "all"
             val_metrics_mlabel = smat_util.MetricsMLabel.generate(val_prob.Y_label, P_label_val,
                                                                   topk=pred_params.only_topk)
@@ -3050,7 +3086,35 @@ class TransformerMultiTask(pecos.BaseClass):
             LOGGER.info(
                 "| mclass-test-acc {:4.2f}".format(100 * val_metrics_mclass.acc),
             )
+
+            avg_matcher_train_prec_mlabel = np.mean(train_metrics_mlabel.prec)
+            train_acc_mclass = train_metrics_mclass.acc
+
+            avg_matcher_val_prec_mlabel = np.mean(val_metrics_mlabel.prec)
+            val_acc_mclass = val_metrics_mclass.acc
+
+            LOGGER.info(
+                "| Final performance in round {}: avg_train_prec_mlabel={:4.4f}, train_acc_mclass={:4.4f}, avg_val_prec_mlabel={:4.4f}, val_acc_mclass={:4.4f},".format(
+                    finetune_round_th,
+                    100 * avg_matcher_train_prec_mlabel,
+                    100 * train_acc_mclass,
+                    100 * avg_matcher_val_prec_mlabel,
+                    100 * val_acc_mclass,
+                ),
+            )
+
             LOGGER.info("*" * 72)
+
+            try:
+                import wandb
+                wandb.log({f"train_acc_mainNC": train_acc_mclass,
+                           f"val_acc_mainNC": val_acc_mclass,
+                           "finetune_round": finetune_round_th})
+                wandb.log({f"train_prec_neighborhoodPred": avg_matcher_train_prec_mlabel,
+                           f"val_prec_neighborhoodPred": avg_matcher_val_prec_mlabel,
+                           "finetune_round": finetune_round_th})
+            except:
+                pass
 
         matcher.clear_cuda()
 
