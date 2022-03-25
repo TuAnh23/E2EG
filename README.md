@@ -125,10 +125,11 @@ source activate giant-xrt
 bash proc_data_multi_task.sh ${dataset}
 # Train model
 experiment_name=multi_task
-runs=1
+runs=5
 data_dir=data/proc_data_multi_task/${dataset}
 model_dir=models/${experiment_name}
 experiment_dir=experiments/${experiment_name}
+cache_dir=models/cache
 params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
-bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${params_path} ${runs}
+bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
 ```

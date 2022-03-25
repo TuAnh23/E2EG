@@ -629,6 +629,7 @@ def do_train(args):
         steps_scale=args.steps_scale,
         label_feat=label_feat,
         model_dir=args.model_dir,
+        cache_dir_offline=args.cache_dir,
     )
 
     xtf.save(f"{args.model_dir}/final")

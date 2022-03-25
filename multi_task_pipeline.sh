@@ -2,8 +2,9 @@
 data_dir=$1                             # e.g., .data/proc_data_multi_task/ogbn-arxiv
 model_dir=$2
 experiment_dir=$3
-params_path=$4
-runs=$5
+cache_dir=$4
+params_path=$5
+runs=$6
 if [ -z ${data_dir} ] || [ ! -d ${data_dir} ]; then
     echo "DATA_DIR does not exist: ${data_dir}"
     exit
@@ -31,6 +32,8 @@ Y_test_main_path=${data_dir}/Y_main.test.npy                # test class matrix
 X_test_txt_path=${data_dir}/X.test.txt                      # test text
 X_test_npz_path=${data_dir}/X.test.tfidf.npz                # test tfidf feature
 X_test_pt_path=${data_dir}/X.test.pt                        # save test tensors here
+
+mkdir -p ${cache_dir}
 
 start_seed=0
 end_seed=runs-1
@@ -64,6 +67,7 @@ do
       --tst-label-path ${Y_val_neighbor_path} \
       --tst-class-path ${Y_val_main_path} \
       --model-dir ${model_dir}/run${seed} \
+      --cache-dir ${cache_dir} \
       --params-path ${params_path} \
       --verbose-level 3 \
       --seed ${seed} \

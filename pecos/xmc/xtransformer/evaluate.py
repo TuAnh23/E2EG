@@ -59,7 +59,7 @@ def do_evaluate(args):
 
     test_metrics_mclass = smat_util.MetricsMClass.generate(y_class_true, y_class_pred.argmax(axis=1))
 
-    print(f"\tMulti-class accuracy: {test_metrics_mclass.acc}\n")
+    print(f"\tMulti-class accuracy: {test_metrics_mclass.acc * 100}\n")
 
 
 if __name__ == "__main__":
