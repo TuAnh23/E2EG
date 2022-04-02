@@ -911,6 +911,7 @@ class XTransformerMultiTask(pecos.BaseClass):
         pred_params=None,
         model_dir=None,
         cache_dir_offline="",
+        weight_loss_strategy=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1150,6 +1151,21 @@ class XTransformerMultiTask(pecos.BaseClass):
                     i + 1 == nr_transformers
                 ) or "linear" in cur_train_params.bootstrap_method
 
+                if weight_loss_strategy == "increase_mclass_loss_each_round":
+                    # Weight the loss for the mclass task lower at the beginning, full (loss=1) in the last round
+                    mclass_weight = 1.0 / (nr_transformers - i)
+                    LOGGER.info(
+                        "Weight of multi-class loss at level {}: {}".format(i, mclass_weight)
+                    )
+                    try:
+                        import wandb
+                        wandb.log({"mclass_loss_weight": mclass_weight,
+                                   "finetune_round": i})
+                    except:
+                        pass
+                else:
+                    mclass_weight = 1
+
                 res_dict = TransformerMultiTask.train(
                     cur_prob,
                     csr_codes=M_pred,
@@ -1166,6 +1182,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     finetune_round_th=i,
                     model_dir=model_dir,
                     cache_dir_offline=cache_dir_offline,
+                    mclass_weight=mclass_weight,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred_label"]

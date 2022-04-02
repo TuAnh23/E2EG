@@ -275,6 +275,12 @@ def parse_arguments():
         help="loss function type for transformer training",
     )
     parser.add_argument(
+        "--weight-loss-strategy",
+        type=str,
+        default=None,
+        help="strategy to weight the two losses in multi-task setting.",
+    )
+    parser.add_argument(
         "--cache-dir",
         default="",
         metavar="PATH",
@@ -619,18 +625,35 @@ def do_train(args):
         else:
             val_prob = None
 
-    xtf = model_type.train(
-        trn_prob,
-        clustering=cluster_chain,
-        val_prob=val_prob,
-        train_params=train_params,
-        pred_params=pred_params,
-        beam_size=args.beam_size,
-        steps_scale=args.steps_scale,
-        label_feat=label_feat,
-        model_dir=args.model_dir,
-        cache_dir_offline=args.cache_dir,
-    )
+    if args.trn_class_path is not None and args.trn_label_path:
+        # This is a multi-task problem
+        xtf = XTransformerMultiTask.train(
+            trn_prob,
+            clustering=cluster_chain,
+            val_prob=val_prob,
+            train_params=train_params,
+            pred_params=pred_params,
+            beam_size=args.beam_size,
+            steps_scale=args.steps_scale,
+            label_feat=label_feat,
+            model_dir=args.model_dir,
+            cache_dir_offline=args.cache_dir,
+            weight_loss_strategy=args.weight_loss_strategy,
+        )
+    else:
+        # XMC problem
+        xtf = XTransformer.train(
+            trn_prob,
+            clustering=cluster_chain,
+            val_prob=val_prob,
+            train_params=train_params,
+            pred_params=pred_params,
+            beam_size=args.beam_size,
+            steps_scale=args.steps_scale,
+            label_feat=label_feat,
+            model_dir=args.model_dir,
+            cache_dir_offline=args.cache_dir,
+        )
 
     xtf.save(f"{args.model_dir}/final")
 

@@ -20,7 +20,7 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=multi_task_base
+experiment_name=multi_task_reduce_loss_mclass
 # Download data
 cd data/proc_data_multi_task
 dataset=ogbn-arxiv

@@ -2457,7 +2457,7 @@ class TransformerMultiTask(pecos.BaseClass):
             raise TypeError(f"Expected CSR or ndarray, got {type(X_feat)}")
         return X_cat
 
-    def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None, finetune_round_th=None):
+    def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None, finetune_round_th=None, mclass_weight=1):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2665,7 +2665,9 @@ class TransformerMultiTask(pecos.BaseClass):
                     label_embedding=(text_model_W_seq, text_model_b_seq),
                 )
                 loss_mlabel = loss_function_mlabel(outputs["logits_mlabel"], inputs["label_values"].to(self.device))
-                loss_mclass = loss_function_mclass(outputs["logits_mclass"], inputs["class_value"].to(self.device))
+                loss_mclass = loss_function_mclass(outputs["logits_mclass"],
+                                                   inputs["class_value"].to(self.device)
+                                                   ) * mclass_weight
 
                 loss_mlabel = loss_mlabel.mean()  # mean() to average on multi-gpu parallel training
                 loss_mclass = loss_mclass.mean()  # mean() to average on multi-gpu parallel training
@@ -2834,6 +2836,7 @@ class TransformerMultiTask(pecos.BaseClass):
         finetune_round_th="",
         model_dir="",
         cache_dir_offline="",
+        mclass_weight=1,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -2980,7 +2983,7 @@ class TransformerMultiTask(pecos.BaseClass):
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:
             LOGGER.info("Start fine-tuning transformer matcher...")
             matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes,
-                                      finetune_round_th=finetune_round_th)
+                                      finetune_round_th=finetune_round_th, mclass_weight=mclass_weight)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
