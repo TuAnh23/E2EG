@@ -278,7 +278,9 @@ def parse_arguments():
         "--weight-loss-strategy",
         type=str,
         default=None,
-        help="strategy to weight the two losses in multi-task setting.",
+        help="strategy to weight the two losses in multi-task setting. "
+             "['increase_mclass_loss_each_round', "
+             "'include_mclass_loss_later_2']",
     )
     parser.add_argument(
         "--cache-dir",
@@ -491,7 +493,7 @@ def do_train(args):
     if args.wandb_username is not None:
         import wandb
         wandb.init(project="UvA Thesis", entity=args.wandb_username, config={"seed": args.seed})
-        wandb.run.name = args.model_dir.split('/')[-2] + f"_seed{args.seed}"
+        wandb.run.name = args.model_dir.split('/')[-2]
 
     params = dict()
 

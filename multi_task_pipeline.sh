@@ -72,7 +72,7 @@ do
       --verbose-level 3 \
       --seed ${seed} \
       --wandb-username tuanh \
-      --weight-loss-strategy "increase_mclass_loss_each_round" \
+      --weight-loss-strategy "include_mclass_loss_later_2" \
       |& tee ${experiment_dir}/run${seed}/train.log
   grep -o "Final performance.*" ${experiment_dir}/run${seed}/train.log >> ${experiment_dir}/run${seed}/val_performance_per_round.log
 

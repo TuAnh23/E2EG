@@ -1151,12 +1151,22 @@ class XTransformerMultiTask(pecos.BaseClass):
                     i + 1 == nr_transformers
                 ) or "linear" in cur_train_params.bootstrap_method
 
-                if weight_loss_strategy == "increase_mclass_loss_each_round":
-                    # Weight the loss for the mclass task lower at the beginning, full (loss=1) in the last round
-                    mclass_weight = 1.0 / (nr_transformers - i)
-                    LOGGER.info(
-                        "Weight of multi-class loss at level {}: {}".format(i, mclass_weight)
-                    )
+                if weight_loss_strategy is not None:
+                    if weight_loss_strategy == "increase_mclass_loss_each_round":
+                        # Weight the loss for the mclass task lower at the beginning, full (loss=1) in the last round
+                        mclass_weight = 1.0 / (nr_transformers - i)
+                        LOGGER.info(
+                            "Weight of multi-class loss at level {}: {}".format(i, mclass_weight)
+                        )
+                    elif weight_loss_strategy == "include_mclass_loss_later_2":
+                        # Do not include mclass loss in the beginning rounds, only the last 2
+                        if i < nr_transformers - 2:
+                            mclass_weight = 0
+                        else:
+                            mclass_weight = 1
+                    else:
+                        raise RuntimeError(f"weight_loss_strategy: {weight_loss_strategy} not defined")
+
                     try:
                         import wandb
                         wandb.log({"mclass_loss_weight": mclass_weight,
