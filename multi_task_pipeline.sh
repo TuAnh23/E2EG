@@ -104,7 +104,8 @@ do
       --model-folder ${model_dir}/run${seed}/${dir} \
       --save-pred-path-mlabel ${experiment_dir}/run${seed}/${dir}_prediction_mlabel \
       --save-pred-path-mclass ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
-      --multi-task
+      --multi-task \
+      --seed ${seed}
   done
 
   #==================== eval ===================

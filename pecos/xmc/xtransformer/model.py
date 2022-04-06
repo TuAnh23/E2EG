@@ -1176,7 +1176,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     elif weight_loss_strategy.startswith("include_mclass_loss_later"):
                         starting_point = int(weight_loss_strategy.split('_')[-1])
                         # Do not include mclass loss in the beginning rounds, only the last 2
-                        if i < nr_transformers - starting_point:
+                        if i < starting_point:
                             mclass_weight = 0
                         else:
                             mclass_weight = 1
