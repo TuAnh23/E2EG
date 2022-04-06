@@ -841,6 +841,15 @@ class XTransformerMultiTask(pecos.BaseClass):
         """
         return self.text_encoder.nr_classes
 
+    @property
+    def mclass_pred_hyperparam(self):
+        """Get the hyperparams of the multi-class prediction head
+
+        Returns:
+            mclass_pred_hyperparam (dict): hyperparams of the text encoder
+        """
+        return self.text_encoder.mclass_pred_hyperparam
+
     def save(self, save_dir):
         """Save the X-Transformer model to file.
 
@@ -856,6 +865,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             "depth": self.depth,
             "nr_labels": self.nr_labels,
             "nr_classes": int(self.nr_classes),
+            "mclass_pred_hyperparam": self.mclass_pred_hyperparam,
         }
         params = self.append_meta(params)
         param_dir = os.path.join(save_dir, "param.json")
@@ -881,8 +891,10 @@ class XTransformerMultiTask(pecos.BaseClass):
         if not os.path.isdir(load_dir):
             raise ValueError(f"load dir does not exist at: {load_dir}")
         with open(os.path.join(load_dir, "text_encoder/param.json")) as json_file:
-            num_classes = json.load(json_file)['nr_classes']
-        text_encoder = TransformerMultiTask.load(os.path.join(load_dir, "text_encoder"), num_classes=num_classes)
+            params = json.load(json_file)
+        text_encoder = TransformerMultiTask.load(os.path.join(load_dir, "text_encoder"), num_classes=params['nr_classes'],
+                                                 mclass_pred_hyperparam=params.get("mclass_pred_hyperparam", None),
+                                                 )
         try:
             concat_model = XLinearModel.load(os.path.join(load_dir, "concat_model"))
             LOGGER.info("Full model loaded from {}".format(load_dir))
@@ -912,6 +924,9 @@ class XTransformerMultiTask(pecos.BaseClass):
         model_dir=None,
         cache_dir_offline="",
         weight_loss_strategy=None,
+        mclass_pred_hyperparam=None,
+        freeze_mclass_head_until=None,
+        freeze_mclass_head_from=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1158,9 +1173,10 @@ class XTransformerMultiTask(pecos.BaseClass):
                         LOGGER.info(
                             "Weight of multi-class loss at level {}: {}".format(i, mclass_weight)
                         )
-                    elif weight_loss_strategy == "include_mclass_loss_later_2":
+                    elif weight_loss_strategy.startswith("include_mclass_loss_later"):
+                        starting_point = int(weight_loss_strategy.split('_')[-1])
                         # Do not include mclass loss in the beginning rounds, only the last 2
-                        if i < nr_transformers - 2:
+                        if i < nr_transformers - starting_point:
                             mclass_weight = 0
                         else:
                             mclass_weight = 1
@@ -1175,6 +1191,25 @@ class XTransformerMultiTask(pecos.BaseClass):
                         pass
                 else:
                     mclass_weight = 1
+
+                freeze_mclass_head = False
+                # Decide whether to freeze the multi-class prediction head at this round i
+                if (
+                        freeze_mclass_head_until is not None
+                        and freeze_mclass_head_from is not None
+                ):
+                    if freeze_mclass_head_from <= i < freeze_mclass_head_until:
+                        freeze_mclass_head = True
+                elif freeze_mclass_head_until is not None:
+                    if i < freeze_mclass_head_until:
+                        freeze_mclass_head = True
+                elif freeze_mclass_head_from is not None:
+                    if freeze_mclass_head_from <= i:
+                        freeze_mclass_head = True
+
+                LOGGER.info(
+                    "Freezing multi-class prediction head: {}".format(freeze_mclass_head)
+                )
 
                 res_dict = TransformerMultiTask.train(
                     cur_prob,
@@ -1193,6 +1228,8 @@ class XTransformerMultiTask(pecos.BaseClass):
                     model_dir=model_dir,
                     cache_dir_offline=cache_dir_offline,
                     mclass_weight=mclass_weight,
+                    mclass_pred_hyperparam=mclass_pred_hyperparam,
+                    freeze_mclass_head=freeze_mclass_head,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred_label"]

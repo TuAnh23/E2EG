@@ -1783,6 +1783,15 @@ class TransformerMultiTask(pecos.BaseClass):
         return self.text_encoder.num_classes
 
     @property
+    def mclass_pred_hyperparam(self):
+        """Get the hyperparams of the multi-class prediction head
+
+        Returns:
+            mclass_pred_hyperparam (dict): hyperparams of the text encoder
+        """
+        return self.text_encoder.mclass_pred_hyperparam
+
+    @property
     def model_type(self):
         """Get the encoder model type"""
         if hasattr(self.text_encoder, "module"):
@@ -1807,6 +1816,7 @@ class TransformerMultiTask(pecos.BaseClass):
             "text_encoder": encoder_to_save.__class__.__name__,
             "nr_labels": self.nr_labels,
             "nr_classes": int(self.nr_classes),
+            "mclass_pred_hyperparam": self.mclass_pred_hyperparam,
             "nr_features": self.nr_features,
             "nr_codes": self.nr_codes,
             "train_params": self.train_params.to_dict(),
@@ -1836,12 +1846,13 @@ class TransformerMultiTask(pecos.BaseClass):
             self.concat_model.save(concat_model_dir)
 
     @classmethod
-    def load(cls, load_dir, num_classes):
+    def load(cls, load_dir, num_classes, mclass_pred_hyperparam=None, freeze_mclass_head=False):
         """Load models, text_tokenizer and training arguments from file
 
         Args:
             load_dir (str): dir to load the models, text_tokenizer and training arguments
             num_classes (int): number of classes for multi-class problem
+            mclass_pred_hyperparam: hyperparams for multi-class prediction head
 
         Returns:
             TransformerMultiTask
@@ -1864,7 +1875,8 @@ class TransformerMultiTask(pecos.BaseClass):
         dnn_type = ENCODER_CLASSES[transformer_type]
         encoder_config = dnn_type.config_class.from_pretrained(encoder_dir)
         text_encoder, loading_info = dnn_type.model_class.from_pretrained(
-            encoder_dir, num_classes=num_classes, config=encoder_config, output_loading_info=True
+            encoder_dir, num_classes=num_classes, config=encoder_config, output_loading_info=True,
+            mclass_pred_hyperparam=mclass_pred_hyperparam, freeze_mclass_head=freeze_mclass_head
         )
         if len(loading_info["missing_keys"]) > 0:
             LOGGER.warning(
@@ -1914,7 +1926,9 @@ class TransformerMultiTask(pecos.BaseClass):
         )
 
     @classmethod
-    def download_model(cls, model_shortcut, num_classes, num_labels=2, hidden_dropout_prob=0.1, cache_dir="", cache_offline=""):
+    def download_model(cls, model_shortcut, num_classes, num_labels=2,
+                       hidden_dropout_prob=0.1, cache_dir="", cache_offline="",
+                       mclass_pred_hyperparam=None, freeze_mclass_head=False):
         """Initialize a matcher by downloading a pre-trained model from s3
 
         Args:
@@ -1926,6 +1940,8 @@ class TransformerMultiTask(pecos.BaseClass):
                             at cache_dir, downloading will be ignored (but still starts HTTPS connection to huggingface)
             cache_offline (str, optional): path to store downloaded model, if the model already exists
                             at cache_offline, avoid starting HTTPS connection to huggingface entirely
+            mclass_pred_hyperparam: hyperparams for the multi-class prediction head
+            freeze_mclass_head: whether to freeze the weights of the multi-class prediction head
 
         Returns:
             TransformerMultiTask
@@ -1967,6 +1983,8 @@ class TransformerMultiTask(pecos.BaseClass):
             config=config,
             num_classes=num_classes,
             cache_dir=use_cache,
+            mclass_pred_hyperparam=mclass_pred_hyperparam,
+            freeze_mclass_head=freeze_mclass_head,
         )
         text_model = TransformerLinearXMCHead(config.hidden_size, num_labels)
         return cls(text_encoder, text_tokenizer, text_model)
@@ -2837,6 +2855,8 @@ class TransformerMultiTask(pecos.BaseClass):
         model_dir="",
         cache_dir_offline="",
         mclass_weight=1,
+        mclass_pred_hyperparam=None,
+        freeze_mclass_head=False,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -2909,6 +2929,8 @@ class TransformerMultiTask(pecos.BaseClass):
                 hidden_dropout_prob=train_params.hidden_dropout_prob,
                 cache_dir=train_params.cache_dir,
                 cache_offline=cache_dir_offline,
+                mclass_pred_hyperparam=mclass_pred_hyperparam,
+                freeze_mclass_head=freeze_mclass_head,
             )
             LOGGER.info("Downloaded {} model from s3.".format(train_params.model_shortcut))
 
@@ -2988,7 +3010,9 @@ class TransformerMultiTask(pecos.BaseClass):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
                 )
-                matcher = TransformerMultiTask.load(train_params.checkpoint_dir, num_classes=prob.Y_class.max() + 1)
+                matcher = TransformerMultiTask.load(train_params.checkpoint_dir, num_classes=prob.Y_class.max() + 1,
+                                                    mclass_pred_hyperparam=mclass_pred_hyperparam,
+                                                    freeze_mclass_head=freeze_mclass_head)
                 matcher.to_device(device, n_gpu)
 
         # ignore concat_model even if there exist one

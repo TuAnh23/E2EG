@@ -278,9 +278,44 @@ def parse_arguments():
         "--weight-loss-strategy",
         type=str,
         default=None,
-        help="strategy to weight the two losses in multi-task setting. "
-             "['increase_mclass_loss_each_round', "
-             "'include_mclass_loss_later_2']",
+        help="strategy to weight the two losses in multi-task setting. The options are:"
+             "increase_mclass_loss_each_round, "
+             "include_mclass_loss_later_at_round_x, where x is an integer",
+    )
+    parser.add_argument(
+        "--numb-layers-mclass-pred",
+        type=int,
+        default=1,
+        help="Number of layers on the multi-class prediction head",
+    )
+    parser.add_argument(
+        "--mclass-pred-dropout-prob",
+        type=float,
+        default=0.0,
+        help="Dropout rate between layers in the multi-class prediction head",
+    )
+    parser.add_argument(
+        "--mclass-pred-batchnorm",
+        action="store_true",
+        help="Whether to use batchnorm between layers in the multi-class prediction head",
+    )
+    parser.add_argument(
+        "--mclass-pred-hidden-size",
+        type=int,
+        default=256,
+        help="Hidden size of linear layers in the multi-class prediction head",
+    )
+    parser.add_argument(
+        "--freeze-mclass-head-until",
+        type=int,
+        default=None,
+        help="Freeze the weights of the multi-class prediction head until (not including) given fine-tuning round",
+    )
+    parser.add_argument(
+        "--freeze-mclass-head-from",
+        type=int,
+        default=None,
+        help="Freeze the weights of the multi-class prediction head from a given fine-tuning round",
     )
     parser.add_argument(
         "--cache-dir",
@@ -490,9 +525,21 @@ def do_train(args):
         args (argparse.Namespace): Command line arguments parsed by `parser.parse_args()`
     """
 
+    config = {"seed": args.seed,
+              "weight_loss_strategy": args.weight_loss_strategy,
+              "numb_layers_mclass_pred": args.numb_layers_mclass_pred,
+              "mclass_pred_dropout_prob": args.mclass_pred_dropout_prob,
+              "mclass_pred_batchnorm": args.mclass_pred_batchnorm,
+              "mclass_pred_hidden_size": args.mclass_pred_hidden_size,
+              "freeze_mclass_head_until": args.freeze_mclass_head_until,
+              "freeze_mclass_head_from": args.freeze_mclass_head_from,
+              }
+
+    LOGGER.info(f"Manual configuration: {config}")
+
     if args.wandb_username is not None:
         import wandb
-        wandb.init(project="UvA Thesis", entity=args.wandb_username, config={"seed": args.seed})
+        wandb.init(project="UvA Thesis", entity=args.wandb_username, config=config)
         wandb.run.name = args.model_dir.split('/')[-2]
 
     params = dict()
@@ -629,6 +676,11 @@ def do_train(args):
 
     if args.trn_class_path is not None and args.trn_label_path:
         # This is a multi-task problem
+        mclass_pred_hyperparam = {"numb_layers_mclass_pred": args.numb_layers_mclass_pred,
+                                  "mclass_pred_dropout_prob": args.mclass_pred_dropout_prob,
+                                  "mclass_pred_batchnorm": args.mclass_pred_batchnorm,
+                                  "mclass_pred_hidden_size": args.mclass_pred_hidden_size
+        }
         xtf = XTransformerMultiTask.train(
             trn_prob,
             clustering=cluster_chain,
@@ -641,6 +693,9 @@ def do_train(args):
             model_dir=args.model_dir,
             cache_dir_offline=args.cache_dir,
             weight_loss_strategy=args.weight_loss_strategy,
+            mclass_pred_hyperparam=mclass_pred_hyperparam,
+            freeze_mclass_head_until=args.freeze_mclass_head_until,
+            freeze_mclass_head_from=args.freeze_mclass_head_from,
         )
     else:
         # XMC problem

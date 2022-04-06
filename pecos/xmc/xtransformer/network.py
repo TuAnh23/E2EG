@@ -280,15 +280,52 @@ class BertForMultiTask(BertPreTrainedModel):
         last_hidden_states = outputs["hidden_states"]
     """
 
-    def __init__(self, config, num_classes):
+    def __init__(self, config, num_classes, mclass_pred_hyperparam=None, freeze_mclass_head=False):
         super(BertForMultiTask, self).__init__(config)
         self.num_labels = config.num_labels  # Number of labels for multi-label XMC
         self.num_classes = num_classes
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.linear = nn.Linear(768, self.num_classes)  # For multi-class classification
-        self.relu = nn.ReLU()  # For multi-class classification
+
+        # For multi-class classification
+        self.mclass_pred_hyperparam = mclass_pred_hyperparam
+        numb_layers_mclass_pred = self.mclass_pred_hyperparam['numb_layers_mclass_pred']
+        mclass_pred_dropout_prob = self.mclass_pred_hyperparam['mclass_pred_dropout_prob']
+        mclass_pred_batchnorm = self.mclass_pred_hyperparam['mclass_pred_batchnorm']
+        mclass_pred_hidden_size = self.mclass_pred_hyperparam['mclass_pred_hidden_size']
+
+
+        self.mclass_seq = nn.Sequential()
+
+        if numb_layers_mclass_pred < 1:
+            raise RuntimeError("Number of layers for multi-class prediction should be at least 1.")
+
+        for i in range(0, numb_layers_mclass_pred):
+            if i == numb_layers_mclass_pred-1:
+                # In the last layer, output number of values correspond to the number of classes
+                linear_output_size = self.num_classes
+            else:
+                linear_output_size = mclass_pred_hidden_size
+
+            if i == 0:
+                # In the first layer, input size is the hidden size of BERT
+                linear_input_size = config.hidden_size
+            else:
+                linear_input_size = mclass_pred_hidden_size
+
+            if i >= 1:
+                self.mclass_seq.add_module(f"dropout{i-1}", nn.Dropout(mclass_pred_dropout_prob))
+            self.mclass_seq.add_module(f"linear{i}", nn.Linear(linear_input_size, linear_output_size))
+            if mclass_pred_batchnorm:
+                self.mclass_seq.add_module(f"batchnorm{i}", nn.BatchNorm1d(linear_output_size))
+            self.mclass_seq.add_module(f"relu{i}", nn.ReLU())
+
+        for param in self.mclass_seq.parameters():
+            if freeze_mclass_head:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
 
         self.init_weights()
 
@@ -331,8 +368,7 @@ class BertForMultiTask(BertPreTrainedModel):
         instance_hidden_states = outputs.last_hidden_state
 
         # For multi-class classification head
-        linear_output = self.linear(pooled_output)
-        logits_mclass = self.relu(linear_output)
+        logits_mclass = self.mclass_seq(pooled_output)
 
         # For multi-label classification XMC head
         logits_mlabel = None
