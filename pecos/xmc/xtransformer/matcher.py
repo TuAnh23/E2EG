@@ -2817,14 +2817,23 @@ class TransformerMultiTask(pecos.BaseClass):
 
                         if save_cur_model:
                             no_improve_cnt = 0
-                            LOGGER.info(
-                                "| **** saving model (avg_val_prec_mlabel={:4.4f}, val_acc_mclass={:4.4f}) to {} at global_step {} ****".format(
-                                    100 * avg_matcher_val_prec_mlabel,
-                                    100 * val_acc_mclass,
-                                    train_params.checkpoint_dir,
-                                    global_step,
+                            if val_prob is not None:
+                                LOGGER.info(
+                                    "| **** saving model (avg_val_prec_mlabel={:4.4f}, val_acc_mclass={:4.4f}) to {} at global_step {} ****".format(
+                                        100 * avg_matcher_val_prec_mlabel,
+                                        100 * val_acc_mclass,
+                                        train_params.checkpoint_dir,
+                                        global_step,
+                                    )
                                 )
-                            )
+                            else:
+                                LOGGER.info(
+                                    "| **** saving model to {} "
+                                    "at global_step {} ****".format(
+                                        train_params.checkpoint_dir,
+                                        global_step,
+                                    )
+                                )
                             best_matcher_acc = val_acc_mclass
                             self.save(train_params.checkpoint_dir)
                         else:
@@ -3004,7 +3013,7 @@ class TransformerMultiTask(pecos.BaseClass):
         # train the matcher
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:
             LOGGER.info("Start fine-tuning transformer matcher...")
-            matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes,
+            matcher.fine_tune_encoder(prob, val_prob=None, val_csr_codes=val_csr_codes,
                                       finetune_round_th=finetune_round_th, mclass_weight=mclass_weight)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(

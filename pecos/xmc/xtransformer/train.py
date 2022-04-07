@@ -718,7 +718,7 @@ def do_train(args):
             cache_dir_offline=args.cache_dir,
         )
 
-    xtf.save(f"{args.model_dir}/final")
+    xtf.save(f"{args.model_dir}/last")
 
 
 if __name__ == "__main__":

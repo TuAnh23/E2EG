@@ -87,7 +87,7 @@ do
 
   #==================== test ===================
   # Restructure the saved models
-  for dir_path in ${model_dir}/run${seed}/round* ${model_dir}/run${seed}/final
+  for dir_path in ${model_dir}/run${seed}/round* ${model_dir}/run${seed}/last
   do
     dir="$(basename -- ${dir_path})"
     if [ -d ${model_dir}/run${seed}/${dir}/text_tokenizer ]; then
@@ -98,7 +98,7 @@ do
     fi
   done
   # Perform tests using every model from each fine-tuning round
-  for dir_path in ${model_dir}/run${seed}/round* ${model_dir}/run${seed}/final
+  for dir_path in ${model_dir}/run${seed}/round*
   do
     dir="$(basename -- ${dir_path})"
     python -m pecos.xmc.xtransformer.predict \
