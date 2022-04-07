@@ -57,6 +57,8 @@ do
     echo "TMPDIR is "$TMPDIR""
   fi
   #==================== train ===================
+  # Store the timestamp of the start of this run to use as runID for wandb
+  timestamp=$(date +%s)
   python -m pecos.xmc.xtransformer.train \
       --trn-text-path ${X_trn_txt_path} \
       --trn-feat-path ${X_trn_npz_path} \
@@ -72,6 +74,7 @@ do
       --verbose-level 3 \
       --seed ${seed} \
       --wandb-username tuanh \
+      --wandb-run-id ${timestamp} \
       --weight-loss-strategy "include_mclass_loss_later_at_round_2" \
       --numb-layers-mclass-pred 2 \
       --mclass-pred-dropout-prob 0.2 \
@@ -109,7 +112,8 @@ do
   done
 
   #==================== eval ===================
-  for dir_path in ${model_dir}/run${seed}/round* ${model_dir}/run${seed}/final
+  # Calculate the test scores from every round
+  for dir_path in ${model_dir}/run${seed}/round*
   do
     dir="$(basename -- ${dir_path})"
     echo ${dir} | tee -a ${experiment_dir}/run${seed}/test_scores.txt
@@ -118,6 +122,12 @@ do
       --y-class-pred ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
       | tee -a ${experiment_dir}/run${seed}/test_scores.txt
   done
+  # Calculate and log the final best validation score and corresponding test score from this run
+  python -m pecos.xmc.xtransformer.final_metrics_collection \
+    --experiment_dir ${experiment_dir}/run${seed} \
+    --wandb-username tuanh \
+    --wandb-run-id ${timestamp} \
+    | tee ${experiment_dir}/run${seed}/final_scores.txt
 done
 #==================== combine results ===================
 python -m results_combiner \

@@ -514,6 +514,12 @@ def parse_arguments():
         default=None,
         help="Username if want to log results to wandb. If not passed, do not use wandb",
     )
+    parser.add_argument(
+        "--wandb-run-id",
+        type=str,
+        default=None,
+        help="Unique run id to log results to wandb",
+    )
 
     return parser
 
@@ -539,7 +545,7 @@ def do_train(args):
 
     if args.wandb_username is not None:
         import wandb
-        wandb.init(project="UvA Thesis", entity=args.wandb_username, config=config)
+        wandb.init(project="UvA Thesis", entity=args.wandb_username, config=config, id=args.wandb_run_id)
         wandb.run.name = args.model_dir.split('/')[-2]
 
     params = dict()
