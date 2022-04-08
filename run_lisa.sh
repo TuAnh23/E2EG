@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
-#SBATCH --time=01-00:00:00
+#SBATCH --time=04-00:00:00
 #SBATCH --mem=48000M
 #SBATCH --output=slurm_output_%A.out
 
@@ -20,7 +20,7 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=multi_task_include_loss_mclass_later_2
+experiment_name=multi_task_main_head_sweep
 # Download data
 cd data/proc_data_multi_task
 dataset=ogbn-arxiv
@@ -60,4 +60,5 @@ runs=5
 trap 'cp -r ${model_dir} $HOME/UvA_Thesis_pecosEXT/models; cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments; cp -r ${cache_dir} $HOME/UvA_Thesis_pecosEXT/models;' EXIT
 # Run train-val-test pipeline
 params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
-bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
+#bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
+bash hyperparams_sweep.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} sweep_configs/${experiment_name}

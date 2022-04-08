@@ -2862,6 +2862,7 @@ class TransformerMultiTask(pecos.BaseClass):
         pred_params=None,
         finetune_round_th="",
         model_dir="",
+        experiment_dir="",
         cache_dir_offline="",
         mclass_weight=1,
         mclass_pred_hyperparam=None,
@@ -3146,15 +3147,17 @@ class TransformerMultiTask(pecos.BaseClass):
             avg_matcher_val_prec_mlabel = np.mean(val_metrics_mlabel.prec)
             val_acc_mclass = val_metrics_mclass.acc
 
-            LOGGER.info(
-                "| Final performance in round {}: avg_train_prec_mlabel={:4.4f}, train_acc_mclass={:4.4f}, avg_val_prec_mlabel={:4.4f}, val_acc_mclass={:4.4f},".format(
+            final_performance_log_str = "Final performance in round {}: avg_train_prec_mlabel={:4.4f}, train_acc_mclass={:4.4f}, avg_val_prec_mlabel={:4.4f}, val_acc_mclass={:4.4f},".format(
                     finetune_round_th,
                     100 * avg_matcher_train_prec_mlabel,
                     100 * train_acc_mclass,
                     100 * avg_matcher_val_prec_mlabel,
                     100 * val_acc_mclass,
-                ),
-            )
+                )
+
+            LOGGER.info("| " + final_performance_log_str)
+            with open(f"{experiment_dir}/val_performance_per_round.log", "a") as f:
+                f.write(final_performance_log_str + "\n")
 
             LOGGER.info("*" * 72)
 

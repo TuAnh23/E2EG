@@ -1,0 +1,30 @@
+program: pecos.xmc.xtransformer.train
+method: bayes
+metric:
+  name: final_val_acc
+  goal: maximize
+parameters:
+  weight-loss-strategy:
+    values: ["increase_mclass_loss_each_round", "include_mclass_loss_later_at_round_1", "include_mclass_loss_later_at_round_2", "include_mclass_loss_later_at_round_3"]
+  numb-layers-mclass-pred:
+    values: [1, 2, 3]
+  mclass-pred-dropout-prob:
+    min: 0.0
+    max: 0.5
+  mclass-pred-batchnorm:
+    values: ["yes", "no"]
+  mclass-pred-hidden-size:
+    values: [128, 256]
+  freeze-mclass-head-from:
+    values: [0, 1, 2, 3]
+  freeze-mclass-head-until:
+    values: [0, 1, 2, 3]
+command:
+  - ${interpreter}
+  - "-m"
+  - ${program}
+  - "--non-swept-params-path"
+  - "sweep_configs/multi_task_main_head_sweep/training_config.json"
+  - "--wandb-sweep"
+  - "yes"
+  - ${args}

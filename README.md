@@ -133,3 +133,8 @@ cache_dir=models/cache
 params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
 bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
 ```
+
+For hyperparams sweep (have to create sweep config folder and define the sweep YAML file first):
+```bash
+bash hyperparams_sweep.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} sweep_configs/${experiment_name}
+```

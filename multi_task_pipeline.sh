@@ -69,6 +69,7 @@ do
       --tst-label-path ${Y_val_neighbor_path} \
       --tst-class-path ${Y_val_main_path} \
       --model-dir ${model_dir}/run${seed} \
+      --experiment-dir ${experiment_dir}/run${seed} \
       --cache-dir ${cache_dir} \
       --params-path ${params_path} \
       --verbose-level 3 \
@@ -78,12 +79,11 @@ do
       --weight-loss-strategy "include_mclass_loss_later_at_round_2" \
       --numb-layers-mclass-pred 2 \
       --mclass-pred-dropout-prob 0.2 \
-      --mclass-pred-batchnorm \
+      --mclass-pred-batchnorm "yes" \
       --mclass-pred-hidden-size 256 \
       --freeze-mclass-head-from 0 \
       --freeze-mclass-head-until 2 \
       |& tee ${experiment_dir}/run${seed}/train.log
-  grep -o "Final performance.*" ${experiment_dir}/run${seed}/train.log >> ${experiment_dir}/run${seed}/val_performance_per_round.log
 
   #==================== test ===================
   # Restructure the saved models

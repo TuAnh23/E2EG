@@ -9,10 +9,12 @@
 #  OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 #  and limitations under the License.
 import argparse
+import glob
 import json
 import logging
 import os
 import sys
+import shutil
 
 import numpy as np
 from pecos.utils import cli, logging_util, smat_util, torch_util
@@ -23,6 +25,8 @@ from pecos.xmc import PostProcessor
 from .matcher import TransformerMatcher, TransformerMultiTask
 from .model import XTransformer, XTransformerMultiTask
 from .module import MLProblemWithText, MLMultiTaskProblemWithText
+
+from .final_metrics_collection import extract_train_performance_logs
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,13 +49,20 @@ def parse_arguments():
         metavar="PARAMS_PATH",
         help="Json file for params (default None)",
     )
+    parser.add_argument(
+        "--non-swept-params-path",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Used only in wandb sweeping: JSON file for fixed params not being swept over.",
+    )
     # ========= train data paths ============
     parser.add_argument(
         "-t",
         "--trn-text-path",
         type=str,
         metavar="PATH",
-        required=not skip_training,
+        # required=not skip_training,
         help="path to the training text file",
     )
     parser.add_argument(
@@ -67,7 +78,7 @@ def parse_arguments():
         "--trn-label-path",
         type=str,
         metavar="PATH",
-        required=not skip_training,
+        # required=not skip_training,
         help="path to the training label matrix (CSR matrix, nr_insts * nr_labels)",
     )
 
@@ -85,8 +96,16 @@ def parse_arguments():
         "--model-dir",
         type=str,
         metavar="DIR",
-        required=not skip_training,
+        # required=not skip_training,
         help="the output directory where the models will be saved.",
+    )
+
+    parser.add_argument(
+        "--experiment-dir",
+        type=str,
+        metavar="DIR",
+        # required=not skip_training,
+        help="the output directory where the experiment output will be saved.",
     )
     # ========= test data paths ============
     parser.add_argument(
@@ -296,8 +315,9 @@ def parse_arguments():
     )
     parser.add_argument(
         "--mclass-pred-batchnorm",
-        action="store_true",
-        help="Whether to use batchnorm between layers in the multi-class prediction head",
+        type=str,
+        default="no",
+        help="Whether to use batchnorm between layers in the multi-class prediction head. 'yes' or 'no'",
     )
     parser.add_argument(
         "--mclass-pred-hidden-size",
@@ -520,6 +540,12 @@ def parse_arguments():
         default=None,
         help="Unique run id to log results to wandb",
     )
+    parser.add_argument(
+        "--wandb-sweep",
+        type=str,
+        default="no",
+        help="Whether running the script from a wandb sweep",
+    )
 
     return parser
 
@@ -530,6 +556,15 @@ def do_train(args):
     Args:
         args (argparse.Namespace): Command line arguments parsed by `parser.parse_args()`
     """
+
+    if args.wandb_sweep == "yes":
+        # If running from a sweep, all fixed params are stored in a json file
+        # Load the params
+        with open(args.non_swept_params_path, 'r') as f:
+            non_swept_params = json.load(f)
+        args_dict = vars(args)
+        for key in non_swept_params.keys():
+            args_dict[key] = non_swept_params[key]
 
     config = {"seed": args.seed,
               "weight_loss_strategy": args.weight_loss_strategy,
@@ -545,7 +580,7 @@ def do_train(args):
 
     if args.wandb_username is not None:
         import wandb
-        wandb.init(project="UvA Thesis", entity=args.wandb_username, config=config, id=args.wandb_run_id)
+        wandb.init(project="UvA_Thesis", entity=args.wandb_username, config=config, id=args.wandb_run_id)
         wandb.run.name = args.model_dir.split('/')[-2]
 
     params = dict()
@@ -697,6 +732,7 @@ def do_train(args):
             steps_scale=args.steps_scale,
             label_feat=label_feat,
             model_dir=args.model_dir,
+            experiment_dir=args.experiment_dir,
             cache_dir_offline=args.cache_dir,
             weight_loss_strategy=args.weight_loss_strategy,
             mclass_pred_hyperparam=mclass_pred_hyperparam,
@@ -719,6 +755,28 @@ def do_train(args):
         )
 
     xtf.save(f"{args.model_dir}/last")
+
+    if args.wandb_sweep == "yes":
+        # Log best validation scores, tranining scores within rounds,
+        # convenient for sweeping (having all logs in 1 training script)
+        best_val_acc, best_val_index, final_train_acc = extract_train_performance_logs(args.experiment_dir)
+        wandb.log({"best_round": best_val_index,
+                   "final_train_acc": final_train_acc,
+                   "final_val_acc": best_val_acc}
+                  )
+
+        # Delete models and experiments output, clear the way for the next run in sweep
+        delete_folder_content(args.model_dir)
+        delete_folder_content(args.experiment_dir)
+
+
+def delete_folder_content(dir_path):
+    def_items = glob.glob(dir_path + "/*")
+    for del_i in def_items:
+        if os.path.isfile(del_i):
+            os.remove(del_i)
+        elif os.path.isdir(del_i):
+            shutil.rmtree(del_i)
 
 
 if __name__ == "__main__":
