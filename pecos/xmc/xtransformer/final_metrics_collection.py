@@ -30,7 +30,7 @@ def main():
 
     if args.wandb_username is not None:
         import wandb
-        wandb.init(project="UvA Thesis", entity=args.wandb_username, id=args.wandb_run_id, resume="must")
+        wandb.init(project="UvA_Thesis", entity=args.wandb_username, id=args.wandb_run_id, resume="must")
         wandb.log({"best_round": best_val_index,
                    "final_train_acc": final_train_acc,
                    "final_val_acc": best_val_acc,
