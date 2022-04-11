@@ -37,6 +37,11 @@ def main():
                    "final_test_acc": final_test_acc}
                   )
 
+        wandb.run.summary["best_round"] = best_val_index
+        wandb.run.summary["final_train_acc"] = final_train_acc
+        wandb.run.summary["final_val_acc"] = best_val_acc
+        wandb.run.summary["final_test_acc"] = final_test_acc
+
 
 def extract_test_performance(best_val_index, experiment_dir):
     # Extract test scores

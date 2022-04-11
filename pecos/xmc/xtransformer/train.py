@@ -765,6 +765,10 @@ def do_train(args):
                    "final_val_acc": best_val_acc}
                   )
 
+        wandb.run.summary["best_round"] = best_val_index
+        wandb.run.summary["final_train_acc"] = final_train_acc
+        wandb.run.summary["final_val_acc"] = best_val_acc
+
         # Delete models and experiments output, clear the way for the next run in sweep
         delete_folder_content(args.model_dir)
         delete_folder_content(args.experiment_dir)
