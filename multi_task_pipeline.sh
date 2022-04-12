@@ -81,8 +81,7 @@ do
       --mclass-pred-dropout-prob 0.2 \
       --mclass-pred-batchnorm "yes" \
       --mclass-pred-hidden-size 256 \
-      --freeze-mclass-head-from 0 \
-      --freeze-mclass-head-until 2 \
+      --freeze-mclass-head-range "0|2" \
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================

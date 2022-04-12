@@ -64,8 +64,12 @@ python -m args_to_json \
     --seed ${seed} \
     --wandb-username tuanh \
     --wandb-sweep yes \
+    --numb-layers-mclass-pred 3 \
+    --mclass-pred-dropout-prob 0.2 \
+    --mclass-pred-batchnorm "yes" \
+    --mclass-pred-hidden-size 256 \
     --save_json_path ${sweep_config_dir}/training_config.json \
-    --swept_args "weight_loss_strategy|numb_layers_mclass_pred|mclass_pred_dropout_prob|mclass_pred_batchnorm|mclass_pred_hidden_size|freeze_mclass_head_from|freeze_mclass_head_until"
+    --swept_args "freeze_scheme"
 
 ##==================== setup sweep ===================
 wandb sweep --entity ${username} --project ${projectname} ${sweep_config_dir}/sweep.yaml |& tee ${sweep_config_dir}/sweep_info.txt

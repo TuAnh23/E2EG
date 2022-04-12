@@ -1,0 +1,17 @@
+program: pecos.xmc.xtransformer.train
+method: grid
+metric:
+  name: final_val_acc
+  goal: maximize
+parameters:
+  freeze-scheme:
+    values: ['warm_up', 'uniform', 'constant', 'default']
+command:
+  - ${interpreter}
+  - "-m"
+  - ${program}
+  - "--non-swept-params-path"
+  - "sweep_configs/freezing_scheme_sweep/training_config.json"
+  - "--wandb-sweep"
+  - "yes"
+  - ${args}

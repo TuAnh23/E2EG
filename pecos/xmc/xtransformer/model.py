@@ -926,8 +926,8 @@ class XTransformerMultiTask(pecos.BaseClass):
         cache_dir_offline="",
         weight_loss_strategy=None,
         mclass_pred_hyperparam=None,
-        freeze_mclass_head_until=None,
-        freeze_mclass_head_from=None,
+        freeze_mclass_head_range=None,
+        init_scheme_mclass_head=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1195,17 +1195,11 @@ class XTransformerMultiTask(pecos.BaseClass):
 
                 freeze_mclass_head = False
                 # Decide whether to freeze the multi-class prediction head at this round i
-                if (
-                        freeze_mclass_head_until is not None
-                        and freeze_mclass_head_from is not None
-                ):
-                    if freeze_mclass_head_from <= i < freeze_mclass_head_until:
-                        freeze_mclass_head = True
-                elif freeze_mclass_head_until is not None:
-                    if i < freeze_mclass_head_until:
-                        freeze_mclass_head = True
-                elif freeze_mclass_head_from is not None:
-                    if freeze_mclass_head_from <= i:
+                if freeze_mclass_head_range is not None:
+                    freeze_mclass_head_from = int(freeze_mclass_head_range.split('|')[0])
+                    freeze_mclass_head_until = int(freeze_mclass_head_range.split('|')[1])
+
+                    if freeze_mclass_head_from <= i <= freeze_mclass_head_until:
                         freeze_mclass_head = True
 
                 LOGGER.info(
@@ -1232,6 +1226,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     mclass_weight=mclass_weight,
                     mclass_pred_hyperparam=mclass_pred_hyperparam,
                     freeze_mclass_head=freeze_mclass_head,
+                    init_scheme_mclass_head=init_scheme_mclass_head,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred_label"]

@@ -280,7 +280,8 @@ class BertForMultiTask(BertPreTrainedModel):
         last_hidden_states = outputs["hidden_states"]
     """
 
-    def __init__(self, config, num_classes, mclass_pred_hyperparam=None, freeze_mclass_head=False):
+    def __init__(self, config, num_classes, mclass_pred_hyperparam=None, freeze_mclass_head=False,
+                 init_scheme_mclass_head=None):
         super(BertForMultiTask, self).__init__(config)
         self.num_labels = config.num_labels  # Number of labels for multi-label XMC
         self.num_classes = num_classes
@@ -294,7 +295,6 @@ class BertForMultiTask(BertPreTrainedModel):
         mclass_pred_dropout_prob = self.mclass_pred_hyperparam['mclass_pred_dropout_prob']
         mclass_pred_batchnorm = self.mclass_pred_hyperparam['mclass_pred_batchnorm']
         mclass_pred_hidden_size = self.mclass_pred_hyperparam['mclass_pred_hidden_size']
-
 
         self.mclass_seq = nn.Sequential()
 
@@ -328,6 +328,21 @@ class BertForMultiTask(BertPreTrainedModel):
                 param.requires_grad = True
 
         self.init_weights()
+
+        if init_scheme_mclass_head is not None and init_scheme_mclass_head != 'default':
+            # Replace the default N(0, 0.02) initialization
+            def manual_weight_init(m):
+                if type(m) == nn.Linear:
+                    if init_scheme_mclass_head == 'uniform':
+                        nn.init.uniform_(m.weight, a=-1.0/m.in_features, b=1.0/m.in_features)
+                        if m.bias is not None:
+                            m.bias.data.fill_(1.0/m.in_features)
+                    elif init_scheme_mclass_head == 'constant':
+                        nn.init.constant_(m.weight, val=1.0/m.in_features)
+                        if m.bias is not None:
+                            m.bias.data.fill_(1.0/m.in_features)
+
+            self.mclass_seq.apply(manual_weight_init)
 
     def init_from(self, model):
         self.bert = model.bert

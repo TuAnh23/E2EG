@@ -1928,7 +1928,8 @@ class TransformerMultiTask(pecos.BaseClass):
     @classmethod
     def download_model(cls, model_shortcut, num_classes, num_labels=2,
                        hidden_dropout_prob=0.1, cache_dir="", cache_offline="",
-                       mclass_pred_hyperparam=None, freeze_mclass_head=False):
+                       mclass_pred_hyperparam=None, freeze_mclass_head=False,
+                       init_scheme_mclass_head=None):
         """Initialize a matcher by downloading a pre-trained model from s3
 
         Args:
@@ -1985,6 +1986,7 @@ class TransformerMultiTask(pecos.BaseClass):
             cache_dir=use_cache,
             mclass_pred_hyperparam=mclass_pred_hyperparam,
             freeze_mclass_head=freeze_mclass_head,
+            init_scheme_mclass_head=init_scheme_mclass_head,
         )
         text_model = TransformerLinearXMCHead(config.hidden_size, num_labels)
         return cls(text_encoder, text_tokenizer, text_model)
@@ -2867,6 +2869,7 @@ class TransformerMultiTask(pecos.BaseClass):
         mclass_weight=1,
         mclass_pred_hyperparam=None,
         freeze_mclass_head=False,
+        init_scheme_mclass_head=None,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -2941,6 +2944,7 @@ class TransformerMultiTask(pecos.BaseClass):
                 cache_offline=cache_dir_offline,
                 mclass_pred_hyperparam=mclass_pred_hyperparam,
                 freeze_mclass_head=freeze_mclass_head,
+                init_scheme_mclass_head=init_scheme_mclass_head,
             )
             LOGGER.info("Downloaded {} model from s3.".format(train_params.model_shortcut))
 

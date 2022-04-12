@@ -326,16 +326,28 @@ def parse_arguments():
         help="Hidden size of linear layers in the multi-class prediction head",
     )
     parser.add_argument(
-        "--freeze-mclass-head-until",
-        type=int,
+        "--freeze-mclass-head-range",
+        type=str,
         default=None,
-        help="Freeze the weights of the multi-class prediction head until (not including) given fine-tuning round",
+        help="Format: x|y (x and y are integers). "
+             "Freeze the weights of the multi-class prediction head in fine-tuning round in range [x, y]",
     )
     parser.add_argument(
-        "--freeze-mclass-head-from",
-        type=int,
+        "--init-scheme-mclass-head",
+        type=str,
         default=None,
-        help="Freeze the weights of the multi-class prediction head from a given fine-tuning round",
+        help="Options: ['uniform', 'constant']"
+             "The scheme to initialize the weights for the layers in the mclass prediction head. "
+             "Important if freeze the mclass head from the beginning.",
+    )
+    parser.add_argument(
+        "--freeze-scheme",
+        type=str,
+        default=None,
+        help="Options: ['warm_up', 'uniform', 'constant', 'default']"
+             "The scheme to initialize the weights when freezing mclass head. "
+             "Use only in development (convenient sweeping)."
+             "This will OVERWRITE --init-scheme-mclass-head AND --freeze-mclass-head-range",
     )
     parser.add_argument(
         "--cache-dir",
@@ -566,14 +578,25 @@ def do_train(args):
         for key in non_swept_params.keys():
             args_dict[key] = non_swept_params[key]
 
+    if args.freeze_scheme == 'warm_up':
+        args.freeze_mclass_head_range = '1|2'
+    elif args.freeze_scheme == 'uniform':
+        args.freeze_mclass_head_range = '0|2'
+        args.init_scheme_mclass_head = 'uniform'
+    elif args.freeze_scheme == 'constant':
+        args.freeze_mclass_head_range = '0|2'
+        args.init_scheme_mclass_head = 'constant'
+    elif args.freeze_scheme == 'default':
+        args.freeze_mclass_head_range = '0|2'
+
     config = {"seed": args.seed,
               "weight_loss_strategy": args.weight_loss_strategy,
               "numb_layers_mclass_pred": args.numb_layers_mclass_pred,
               "mclass_pred_dropout_prob": args.mclass_pred_dropout_prob,
               "mclass_pred_batchnorm": args.mclass_pred_batchnorm,
               "mclass_pred_hidden_size": args.mclass_pred_hidden_size,
-              "freeze_mclass_head_until": args.freeze_mclass_head_until,
-              "freeze_mclass_head_from": args.freeze_mclass_head_from,
+              "freeze_mclass_head_range": args.freeze_mclass_head_range,
+              "init_scheme_mclass_head": args.init_scheme_mclass_head,
               }
 
     LOGGER.info(f"Manual configuration: {config}")
@@ -736,8 +759,8 @@ def do_train(args):
             cache_dir_offline=args.cache_dir,
             weight_loss_strategy=args.weight_loss_strategy,
             mclass_pred_hyperparam=mclass_pred_hyperparam,
-            freeze_mclass_head_until=args.freeze_mclass_head_until,
-            freeze_mclass_head_from=args.freeze_mclass_head_from,
+            freeze_mclass_head_range=args.freeze_mclass_head_range,
+            init_scheme_mclass_head=args.init_scheme_mclass_head,
         )
     else:
         # XMC problem
