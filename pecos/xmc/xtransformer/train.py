@@ -32,6 +32,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 def parse_arguments():
+    def none_or_str(value: str):
+        if value.lower() == 'none':
+            return None
+        return value
+
     """Parse training arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -295,7 +300,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--weight-loss-strategy",
-        type=str,
+        type=none_or_str,
         default=None,
         help="strategy to weight the two losses in multi-task setting. The options are:"
              "increase_mclass_loss_each_round, "
@@ -327,14 +332,14 @@ def parse_arguments():
     )
     parser.add_argument(
         "--freeze-mclass-head-range",
-        type=str,
+        type=none_or_str,
         default=None,
         help="Format: x|y (x and y are integers). "
              "Freeze the weights of the multi-class prediction head in fine-tuning round in range [x, y]",
     )
     parser.add_argument(
         "--init-scheme-mclass-head",
-        type=str,
+        type=none_or_str,
         default=None,
         help="Options: ['uniform', 'constant']"
              "The scheme to initialize the weights for the layers in the mclass prediction head. "

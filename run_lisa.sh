@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
-#SBATCH --time=00-12:00:00
+#SBATCH --time=04-00:00:00
 #SBATCH --mem=48000M
 #SBATCH --output=slurm_output_%A.out
 
@@ -20,7 +20,7 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=freezing_scheme_sweep
+experiment_name=freeze_numLayers_sweep
 # Download data
 cd data/proc_data_multi_task
 dataset=ogbn-arxiv

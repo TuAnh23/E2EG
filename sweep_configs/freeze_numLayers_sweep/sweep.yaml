@@ -1,0 +1,19 @@
+program: pecos.xmc.xtransformer.train
+method: grid
+metric:
+  name: final_val_acc
+  goal: maximize
+parameters:
+  numb-layers-mclass-pred:
+    values: [1, 2, 3]
+  freeze-mclass-head-range:
+    values: ["None", "1|1", "1|2"]
+command:
+  - ${interpreter}
+  - "-m"
+  - ${program}
+  - "--non-swept-params-path"
+  - "sweep_configs/freeze_numLayers_sweep/training_config.json"
+  - "--wandb-sweep"
+  - "yes"
+  - ${args}

@@ -1,0 +1,19 @@
+program: pecos.xmc.xtransformer.train
+method: grid
+metric:
+  name: final_val_acc
+  goal: maximize
+parameters:
+  weight-loss-strategy:
+    values: ["None", "increase_mclass_loss_each_round", "include_mclass_loss_later_at_round_1", "include_mclass_loss_later_at_round_2", "include_mclass_loss_later_at_round_3"]
+  numb-layers-mclass-pred:
+    values: [1, 2, 3]
+command:
+  - ${interpreter}
+  - "-m"
+  - ${program}
+  - "--non-swept-params-path"
+  - "sweep_configs/weightLoss_numLayers_sweep/training_config.json"
+  - "--wandb-sweep"
+  - "yes"
+  - ${args}
