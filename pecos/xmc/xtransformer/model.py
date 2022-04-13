@@ -27,6 +27,8 @@ from pecos.xmc.xlinear.model import XLinearModel
 from .matcher import TransformerMatcher, TransformerMultiTask
 from .module import MLProblemWithText, MLMultiTaskProblemWithText
 
+from .final_metrics_collection import extract_train_performance_logs
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -1105,53 +1107,78 @@ class XTransformerMultiTask(pecos.BaseClass):
             M, val_M = None, None
             M_pred, val_M_pred = None, None
             bootstrapping, inst_embeddings = None, None
-            for i in range(nr_transformers):
-                cur_train_params = train_params.matcher_params_chain[i]
-                cur_pred_params = pred_params.matcher_params_chain[i]
-                cur_train_params.max_steps = steps_scale[i] * cur_train_params.max_steps
+            for i in range(nr_transformers+1):
+                if i == nr_transformers:
+                    # This is the additional round for mclass
+                    additional_mclass_round = True
+                    # Set the level of mlabel to be the last level
+                    level_i = i - 1
+                    # Check if the last round has the best validation accuracy
+                    # if not, then model already overfit, no need to run this additional round
+                    _, best_round_index, _ = extract_train_performance_logs(experiment_dir)
+                    if best_round_index < nr_transformers-1:
+                        break
+                    # Set incompatible variables from the mlabel task. We do not need mlabel anyway
+                    M, val_M = None, None
+                    M_pred, val_M_pred = None, None
+                else:
+                    additional_mclass_round = False
+                    level_i = i
+
+                cur_train_params = train_params.matcher_params_chain[level_i]
+                cur_pred_params = pred_params.matcher_params_chain[level_i]
+                cur_train_params.max_steps = steps_scale[level_i] * cur_train_params.max_steps
                 cur_train_params.num_train_epochs = (
-                    steps_scale[i] * cur_train_params.num_train_epochs
+                    steps_scale[level_i] * cur_train_params.num_train_epochs
                 )
 
                 cur_ns = cur_train_params.negative_sampling
 
-                # construct train and val problem for level i
+                # construct train and val problem for level level_i
                 # note that final layer do not need X_feat
-                if i > 0:
-                    M = get_negative_samples(YC_list[i - 1], M_pred, cur_ns)
+                if level_i > 0 and not additional_mclass_round:
+                    M = get_negative_samples(YC_list[level_i - 1], M_pred, cur_ns)
 
                 cur_prob = MLMultiTaskProblemWithText(
                     prob.X_text,
-                    YC_list[i],
+                    YC_list[level_i],
                     Y_class=prob.Y_class,
-                    X_feat=None if i == nr_transformers - 1 else prob.X_feat,
-                    C=clustering[i],
+                    X_feat=None if level_i == nr_transformers - 1 else prob.X_feat,
+                    C=clustering[level_i],
                     M=M,
                 )
                 if val_prob is not None:
-                    if i > 0:
-                        val_M = get_negative_samples(val_YC_list[i - 1], val_M_pred, cur_ns)
+                    if level_i > 0 and not additional_mclass_round:
+                        val_M = get_negative_samples(val_YC_list[level_i - 1], val_M_pred, cur_ns)
                     cur_val_prob = MLMultiTaskProblemWithText(
                         val_prob.X_text,
-                        val_YC_list[i],
+                        val_YC_list[level_i],
                         Y_class=val_prob.Y_class,
-                        X_feat=None if i == nr_transformers - 1 else val_prob.X_feat,
-                        C=clustering[i],
+                        X_feat=None if level_i == nr_transformers - 1 else val_prob.X_feat,
+                        C=clustering[level_i],
                         M=val_M,
                     )
                 else:
                     cur_val_prob = None
 
                 avr_trn_labels = (
-                    float(cur_prob.M.nnz) / YC_list[i].shape[0]
+                    float(cur_prob.M.nnz) / YC_list[level_i].shape[0]
                     if cur_prob.M is not None
-                    else YC_list[i].shape[1]
+                    else YC_list[level_i].shape[1]
                 )
-                LOGGER.info(
-                    "Fine-tuning XR-Transformer with {} at level {}, nr_labels={}, avr_M_nnz={}".format(
-                        cur_ns, i, YC_list[i].shape[1], avr_trn_labels
+
+                if additional_mclass_round:
+                    LOGGER.info(
+                        "Fine-tuning additional round {} for mclass. XR-Transformer with {} at level {}, nr_labels={}, avr_M_nnz={}.".format(
+                            i, cur_ns, level_i, YC_list[level_i].shape[1], avr_trn_labels
+                        )
                     )
-                )
+                else:
+                    LOGGER.info(
+                        "Fine-tuning XR-Transformer with {} at level {}, nr_labels={}, avr_M_nnz={}".format(
+                            cur_ns, level_i, YC_list[level_i].shape[1], avr_trn_labels
+                        )
+                    )
 
                 # bootstrapping with previous text_encoder and instance embeddings
                 if parent_model is not None:
@@ -1161,46 +1188,54 @@ class XTransformerMultiTask(pecos.BaseClass):
 
                 # determine whether train prediction and instance embeddings are needed
                 return_train_pred = (
-                    i + 1 < nr_transformers
-                ) and "man" in train_params.matcher_params_chain[i + 1].negative_sampling
+                    level_i + 1 < nr_transformers
+                ) and "man" in train_params.matcher_params_chain[level_i + 1].negative_sampling
                 return_train_embeddings = (
-                    i + 1 == nr_transformers
+                    level_i + 1 == nr_transformers
                 ) or "linear" in cur_train_params.bootstrap_method
 
                 if weight_loss_strategy is not None:
                     if weight_loss_strategy == "increase_mclass_loss_each_round":
                         # Weight the loss for the mclass task lower at the beginning, full (loss=1) in the last round
-                        mclass_weight = 1.0 / (nr_transformers - i)
+                        mclass_weight = 1.0 / (nr_transformers - level_i)
                         LOGGER.info(
-                            "Weight of multi-class loss at level {}: {}".format(i, mclass_weight)
+                            "Weight of multi-class loss at level {}: {}".format(level_i, mclass_weight)
                         )
                     elif weight_loss_strategy.startswith("include_mclass_loss_later"):
                         starting_point = int(weight_loss_strategy.split('_')[-1])
-                        # Do not include mclass loss in the beginning rounds, only the last 2
-                        if i < starting_point:
+                        # Do not include mclass loss in the beginning rounds
+                        if level_i < starting_point:
                             mclass_weight = 0
                         else:
                             mclass_weight = 1
                     else:
                         raise RuntimeError(f"weight_loss_strategy: {weight_loss_strategy} not defined")
 
+                    if additional_mclass_round:
+                        # In the additional round, mclass loss should always be included fully
+                        mclass_weight = 1
+
                     try:
                         import wandb
                         wandb.log({"mclass_loss_weight": mclass_weight,
-                                   "finetune_round": i})
+                                   "finetune_round": level_i})
                     except:
                         pass
                 else:
                     mclass_weight = 1
 
                 freeze_mclass_head = False
-                # Decide whether to freeze the multi-class prediction head at this round i
+                # Decide whether to freeze the multi-class prediction head at this round level_i
                 if freeze_mclass_head_range is not None:
                     freeze_mclass_head_from = int(freeze_mclass_head_range.split('|')[0])
                     freeze_mclass_head_until = int(freeze_mclass_head_range.split('|')[1])
 
-                    if freeze_mclass_head_from <= i <= freeze_mclass_head_until:
+                    if freeze_mclass_head_from <= level_i <= freeze_mclass_head_until:
                         freeze_mclass_head = True
+
+                if additional_mclass_round:
+                    # In the additional round, mclass head should never be freezed
+                    freeze_mclass_head = False
 
                 LOGGER.info(
                     "Freezing multi-class prediction head: {}".format(freeze_mclass_head)
@@ -1227,6 +1262,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     mclass_pred_hyperparam=mclass_pred_hyperparam,
                     freeze_mclass_head=freeze_mclass_head,
                     init_scheme_mclass_head=init_scheme_mclass_head,
+                    additional_mclass_round=additional_mclass_round,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred_label"]

@@ -9,6 +9,7 @@
 #  OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 #  and limitations under the License.
 import copy
+import gc
 import json
 import logging
 import os
@@ -2477,7 +2478,8 @@ class TransformerMultiTask(pecos.BaseClass):
             raise TypeError(f"Expected CSR or ndarray, got {type(X_feat)}")
         return X_cat
 
-    def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None, finetune_round_th=None, mclass_weight=1):
+    def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None,
+                          finetune_round_th=None, mclass_weight=1, additional_mclass_round=False):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2493,6 +2495,15 @@ class TransformerMultiTask(pecos.BaseClass):
         """
         train_params = self.train_params
         pred_params = self.pred_params
+
+        if additional_mclass_round:
+            # Set up constantly saving and early stopping
+            train_params.save_steps = 500
+            train_params.max_steps = 25000
+            train_params.max_no_improve_cnt = 2
+        else:
+            # No need to perform evaluation in the middle of the training process, unless it is the last mclass round
+            val_prob = None
 
         loss_function_mlabel = TransformerMultiTask.get_loss_function_mlabel(train_params.loss_function_mlabel).to(
             self.device
@@ -2696,7 +2707,9 @@ class TransformerMultiTask(pecos.BaseClass):
                     loss_mlabel = loss_mlabel / train_params.gradient_accumulation_steps
                     loss_mclass = loss_mclass / train_params.gradient_accumulation_steps
 
-                loss_mlabel.backward(retain_graph=True)  # backpropagate the two losses together
+                # Dont backpropagate the mlabel loss in the additional round
+                if not additional_mclass_round:
+                    loss_mlabel.backward(retain_graph=True)
                 loss_mclass.backward()
 
                 tr_loss_mlabel += loss_mlabel.item()
@@ -2750,6 +2763,10 @@ class TransformerMultiTask(pecos.BaseClass):
                         logging_loss_mlabel = tr_loss_mlabel
                         logging_loss_mclass = tr_loss_mclass
                         logging_elapsed = 0
+
+                    # Delete the variables from the training process to free up RAM
+                    del batch, inputs, text_model_W_seq, text_model_b_seq, outputs, loss_mlabel, loss_mclass
+                    gc.collect()
 
                     if train_params.save_steps > 0 and global_step % train_params.save_steps == 0:
                         # Evaluate on validation set
@@ -2870,6 +2887,7 @@ class TransformerMultiTask(pecos.BaseClass):
         mclass_pred_hyperparam=None,
         freeze_mclass_head=False,
         init_scheme_mclass_head=None,
+        additional_mclass_round=False,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -3018,8 +3036,9 @@ class TransformerMultiTask(pecos.BaseClass):
         # train the matcher
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:
             LOGGER.info("Start fine-tuning transformer matcher...")
-            matcher.fine_tune_encoder(prob, val_prob=None, val_csr_codes=val_csr_codes,
-                                      finetune_round_th=finetune_round_th, mclass_weight=mclass_weight)
+            matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes,
+                                      finetune_round_th=finetune_round_th, mclass_weight=mclass_weight,
+                                      additional_mclass_round=additional_mclass_round)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
