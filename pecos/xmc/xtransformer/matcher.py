@@ -1781,7 +1781,10 @@ class TransformerMultiTask(pecos.BaseClass):
     @property
     def nr_classes(self):
         """Get the number of classes"""
-        return self.text_encoder.num_classes
+        if hasattr(self.text_encoder, "module"):
+            return self.text_encoder.module.num_classes
+        else:
+            return self.text_encoder.num_classes
 
     @property
     def mclass_pred_hyperparam(self):
@@ -1790,7 +1793,10 @@ class TransformerMultiTask(pecos.BaseClass):
         Returns:
             mclass_pred_hyperparam (dict): hyperparams of the text encoder
         """
-        return self.text_encoder.mclass_pred_hyperparam
+        if hasattr(self.text_encoder, "module"):
+            return self.text_encoder.module.mclass_pred_hyperparam
+        else:
+            return self.text_encoder.mclass_pred_hyperparam
 
     @property
     def model_type(self):
