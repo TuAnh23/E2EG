@@ -290,6 +290,7 @@ class BertForMultiTask(BertPreTrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # For multi-class classification
+        self.freeze_mclass_head = freeze_mclass_head
         self.mclass_pred_hyperparam = mclass_pred_hyperparam
         numb_layers_mclass_pred = self.mclass_pred_hyperparam['numb_layers_mclass_pred']
         mclass_pred_dropout_prob = self.mclass_pred_hyperparam['mclass_pred_dropout_prob']
@@ -321,12 +322,6 @@ class BertForMultiTask(BertPreTrainedModel):
                 self.mclass_seq.add_module(f"batchnorm{i}", nn.BatchNorm1d(linear_output_size))
             self.mclass_seq.add_module(f"relu{i}", nn.ReLU())
 
-        for param in self.mclass_seq.parameters():
-            if freeze_mclass_head:
-                param.requires_grad = False
-            else:
-                param.requires_grad = True
-
         self.init_weights()
 
         if init_scheme_mclass_head is not None and init_scheme_mclass_head != 'default':
@@ -344,8 +339,21 @@ class BertForMultiTask(BertPreTrainedModel):
 
             self.mclass_seq.apply(manual_weight_init)
 
+        for param in self.mclass_seq.parameters():
+            if self.freeze_mclass_head:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
     def init_from(self, model):
         self.bert = model.bert
+        self.mclass_seq = model.mclass_seq
+        for param in self.mclass_seq.parameters():
+            if self.freeze_mclass_head:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
 
     @add_start_docstrings(BERT_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
     def forward(
