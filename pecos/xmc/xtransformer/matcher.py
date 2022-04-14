@@ -2770,13 +2770,13 @@ class TransformerMultiTask(pecos.BaseClass):
                         logging_loss_mclass = tr_loss_mclass
                         logging_elapsed = 0
 
-                    # Delete the variables from the training process to free up RAM
-                    del batch, inputs, text_model_W_seq, text_model_b_seq, outputs, loss_mlabel, loss_mclass
-                    gc.collect()
-
                     if train_params.save_steps > 0 and global_step % train_params.save_steps == 0:
                         # Evaluate on validation set
                         if val_prob is not None:
+                            # Delete the variables from the training process to free up RAM for validation
+                            del batch, inputs, text_model_W_seq, text_model_b_seq, outputs, loss_mlabel, loss_mclass
+                            gc.collect()
+
                             if val_prob.M is None:
                                 test_combos = zip(["all"], [None])
                             else:
@@ -3015,7 +3015,11 @@ class TransformerMultiTask(pecos.BaseClass):
             init_encoder, init_embeddings, prev_head = bootstrapping
             matcher.text_encoder.init_from(init_encoder)
             LOGGER.info("Continue training form given text_encoder!")
-            if "linear" in train_params.bootstrap_method:
+            if additional_mclass_round:
+                # Take the mlabel prediction head directly from the last round
+                matcher.text_model = prev_head
+                LOGGER.info("Initialized transformer text_model by cloning previous round's text_model.")
+            elif "linear" in train_params.bootstrap_method:
                 bootstrap_prob = MLProblem(
                     init_embeddings,
                     prob.Y_label,
