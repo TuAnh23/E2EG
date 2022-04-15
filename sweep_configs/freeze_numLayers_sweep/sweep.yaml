@@ -7,7 +7,9 @@ parameters:
   numb-layers-mclass-pred:
     values: [1, 2, 3]
   freeze-mclass-head-range:
-    values: ["None", "1|1", "1|2"]
+    values: ["0|0", "0|1", "0|2"]
+  init-scheme-mclass-head:
+    value: "uniform"
 command:
   - ${interpreter}
   - "-m"
