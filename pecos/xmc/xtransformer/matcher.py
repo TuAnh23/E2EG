@@ -2506,7 +2506,7 @@ class TransformerMultiTask(pecos.BaseClass):
             # Set up constantly saving and early stopping
             train_params.save_steps = 500
             train_params.max_steps = 25000
-            train_params.max_no_improve_cnt = 2
+            train_params.max_no_improve_cnt = 5
         else:
             # No need to perform evaluation in the middle of the training process, unless it is the last mclass round
             val_prob = None

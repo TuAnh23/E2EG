@@ -5,7 +5,7 @@
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
 #SBATCH --time=04-00:00:00
-#SBATCH --mem=48000M
+#SBATCH --mem=62500M
 #SBATCH --output=slurm_output_%A.out
 
 nvidia-smi
