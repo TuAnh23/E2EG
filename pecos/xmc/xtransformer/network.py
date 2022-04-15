@@ -318,9 +318,12 @@ class BertForMultiTask(BertPreTrainedModel):
             if i >= 1:
                 self.mclass_seq.add_module(f"dropout{i-1}", nn.Dropout(mclass_pred_dropout_prob))
             self.mclass_seq.add_module(f"linear{i}", nn.Linear(linear_input_size, linear_output_size))
-            if mclass_pred_batchnorm == "yes":
-                self.mclass_seq.add_module(f"batchnorm{i}", nn.BatchNorm1d(linear_output_size))
-            self.mclass_seq.add_module(f"relu{i}", nn.ReLU())
+
+            if i != numb_layers_mclass_pred - 1:
+                # Batchnorm and relu in between layers
+                if mclass_pred_batchnorm == "yes":
+                    self.mclass_seq.add_module(f"batchnorm{i}", nn.BatchNorm1d(linear_output_size))
+                self.mclass_seq.add_module(f"relu{i}", nn.ReLU())
 
         self.init_weights()
 
