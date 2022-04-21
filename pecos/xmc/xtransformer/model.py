@@ -222,6 +222,7 @@ class XTransformer(pecos.BaseClass):
         train_params=None,
         pred_params=None,
         model_dir=None,
+        cache_dir_offline="",
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -472,6 +473,7 @@ class XTransformer(pecos.BaseClass):
                     return_train_embeddings=return_train_embeddings,
                     saved_trn_pt=saved_trn_pt,
                     saved_val_pt=saved_val_pt,
+                    cache_dir_offline=cache_dir_offline,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred"]

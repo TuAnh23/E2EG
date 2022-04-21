@@ -107,6 +107,27 @@ python -u baseline_models/bert_classifier.py \
   | tee -a experiments/bert_classifier/train.log
 ```
 
+Train GIANT without including test and val node features:
+```bash
+# Download data
+cd data/proc_data_multi_task
+dataset=ogbn-arxiv
+bash download_data.sh ${dataset}
+cd ../../
+# Process data
+source activate giant-xrt
+bash proc_data_multi_task.sh ${dataset}
+# Train model
+experiment_name=giant_reduce
+runs=5
+data_dir=data/proc_data_multi_task/${dataset}
+model_dir=models/${experiment_name}
+experiment_dir=experiments/${experiment_name}
+cache_dir=models/cache
+params_path=data/proc_data_multi_task/params_xrt_${dataset}.json
+bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
+```
+
 ### Proposed models
 Note: in this repository, we make a clear distinction between `multi-label` classification tasks and `multi-class` classification tasks (whereas in real-life, the term "label" and "class" might be used interchangeably)
 

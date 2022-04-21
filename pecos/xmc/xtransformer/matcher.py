@@ -415,7 +415,7 @@ class TransformerMatcher(pecos.BaseClass):
         )
 
     @classmethod
-    def download_model(cls, model_shortcut, num_labels=2, hidden_dropout_prob=0.1, cache_dir=""):
+    def download_model(cls, model_shortcut, num_labels=2, hidden_dropout_prob=0.1, cache_dir="", cache_offline=""):
         """Initialize a matcher by downloading a pre-trained model from s3
 
         Args:
@@ -423,15 +423,34 @@ class TransformerMatcher(pecos.BaseClass):
             num_labels (int): model output size
             hidden_dropout_prob (float, optional): hidden states dropout probability. Default 0.1
             cache_dir (str, optional): path to store downloaded model, if the model already exists
-                            at cache_dir, downloading will be ignored
+                            at cache_dir, downloading will be ignored (but still starts HTTPS connection to huggingface)
+            cache_offline (str, optional): path to store downloaded model, if the model already exists
+                            at cache_offline, avoid starting HTTPS connection to huggingface entirely
 
         Returns:
             TransformerMatcher
         """
+        save_path = f"{cache_offline}/{model_shortcut}"
         use_cache = cache_dir if cache_dir else None
+
+        if not os.path.isdir(save_path):
+            os.mkdir(save_path)
+            hf_hub_download(repo_id=model_shortcut, filename="config.json", cache_dir=save_path,
+                            force_filename="config.json")
+            hf_hub_download(repo_id=model_shortcut, filename="pytorch_model.bin", cache_dir=save_path,
+                            force_filename="pytorch_model.bin")
+            hf_hub_download(repo_id=model_shortcut, filename="tokenizer.json", cache_dir=save_path,
+                            force_filename="tokenizer.json")
+            hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path,
+                            force_filename="tokenizer_config.json")
+            hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path,
+                            force_filename="vocab.txt")
+
+        LOGGER.info("Load model from {}.".format(save_path))
+
         # AutoConfig will infer transformer type from shortcut
         config = AutoConfig.from_pretrained(
-            model_shortcut,
+            save_path,
             hidden_dropout_prob=hidden_dropout_prob,
             output_hidden_states=False,
             summary_use_proj=False,
@@ -444,11 +463,11 @@ class TransformerMatcher(pecos.BaseClass):
 
         dnn_type = ENCODER_CLASSES[config.model_type]
         text_tokenizer = dnn_type.tokenizer_class.from_pretrained(
-            model_shortcut,
+            save_path,
             cache_dir=use_cache,
         )
         text_encoder = dnn_type.model_class.from_pretrained(
-            model_shortcut,
+            save_path,
             config=config,
             cache_dir=use_cache,
         )
@@ -1261,6 +1280,7 @@ class TransformerMatcher(pecos.BaseClass):
         val_csr_codes=None,
         train_params=None,
         pred_params=None,
+        cache_dir_offline="",
         **kwargs,
     ):
         """Train the transformer matcher
@@ -1330,6 +1350,7 @@ class TransformerMatcher(pecos.BaseClass):
                 prob.Y_label.shape[1],
                 hidden_dropout_prob=train_params.hidden_dropout_prob,
                 cache_dir=train_params.cache_dir,
+                cache_offline=cache_dir_offline,
             )
             LOGGER.info("Downloaded {} model from s3.".format(train_params.model_shortcut))
 

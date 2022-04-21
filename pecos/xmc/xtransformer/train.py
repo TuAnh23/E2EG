@@ -667,8 +667,9 @@ def do_train(args):
     LOGGER.info("Loaded training label matrix with shape={}".format(Y_trn_mlabel.shape))
 
     # Load training classes
-    Y_trn_mclass = np.load(args.trn_class_path)
-    LOGGER.info("Loaded training classes array with shape={}".format(Y_trn_mclass.shape))
+    if args.trn_class_path is not None:
+        Y_trn_mclass = np.load(args.trn_class_path)
+        LOGGER.info("Loaded training classes array with shape={}".format(Y_trn_mclass.shape))
 
     # Load test feature if given
     if args.tst_feat_path:
