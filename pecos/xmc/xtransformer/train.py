@@ -357,13 +357,13 @@ def parse_arguments():
     parser.add_argument(
         "--mclass-pred-dropout-prob",
         type=float,
-        default=0.0,
+        default=0.2,
         help="Dropout rate between layers in the multi-class prediction head",
     )
     parser.add_argument(
         "--mclass-pred-batchnorm",
         type=str,
-        default="no",
+        default="yes",
         help="Whether to use batchnorm between layers in the multi-class prediction head. 'yes' or 'no'",
     )
     parser.add_argument(

@@ -80,13 +80,13 @@ do
       --seed ${seed} \
       --wandb-username tuanh \
       --wandb-run-id ${timestamp} \
-      --weight-loss-strategy "include_mclass_loss_later_at_round_2" \
-      --numb-layers-mclass-pred 2 \
+      --weight-loss-strategy "None" \
+      --numb-layers-mclass-pred 1 \
       --mclass-pred-dropout-prob 0.2 \
       --mclass-pred-batchnorm "yes" \
       --mclass-pred-hidden-size 256 \
-      --freeze-mclass-head-range "0|2" \
-      --include-Xval-Xtest-for-training true \
+      --freeze-mclass-head-range "None" \
+      --include-Xval-Xtest-for-training "true" \
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================

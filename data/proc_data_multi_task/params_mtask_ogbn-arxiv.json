@@ -56,7 +56,7 @@
    "adam_epsilon": 1e-08,
    "warmup_steps": 200,
    "logging_steps": 200,
-   "save_steps": 2841,
+   "save_steps": 99999999,
    "cost_sensitive_ranker": false,
    "use_gpu": true,
    "checkpoint_dir": "",
