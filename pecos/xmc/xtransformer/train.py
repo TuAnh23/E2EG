@@ -15,6 +15,7 @@ import logging
 import os
 import sys
 import shutil
+from scipy.sparse import vstack
 
 import numpy as np
 from pecos.utils import cli, logging_util, smat_util, torch_util
@@ -36,6 +37,14 @@ def parse_arguments():
         if value.lower() == 'none':
             return None
         return value
+
+    def str_to_bool(value: str):
+        if value.lower() == 'yes' or value.lower() == 'true':
+            return True
+        elif value.lower() == 'no' or value.lower() == 'false':
+            return False
+        else:
+            raise ValueError
 
     """Parse training arguments"""
     parser = argparse.ArgumentParser()
@@ -112,10 +121,43 @@ def parse_arguments():
         # required=not skip_training,
         help="the output directory where the experiment output will be saved.",
     )
+    # ========= val data paths ============
+    parser.add_argument(
+        "-tv",
+        "--val-text-path",
+        type=str,
+        metavar="PATH",
+        default="",
+        help="path to the val text file",
+    )
+    parser.add_argument(
+        "-xv",
+        "--val-feat-path",
+        type=str,
+        metavar="PATH",
+        default="",
+        help="path to the val instance feature matrix",
+    )
+    parser.add_argument(
+        "-yv-mlabel",
+        "--val-label-path",
+        type=str,
+        metavar="PATH",
+        default="",
+        help="path to the file of the val label matrix",
+    )
+    parser.add_argument(
+        "-yv-mclass",
+        "--val-class-path",
+        type=str,
+        metavar="PATH",
+        default="",
+        help="path to the file of the val class array",
+    )
     # ========= test data paths ============
     parser.add_argument(
         "-tt",
-        "--tst-text-path",
+        "--test-text-path",
         type=str,
         metavar="PATH",
         default="",
@@ -123,7 +165,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "-xt",
-        "--tst-feat-path",
+        "--test-feat-path",
         type=str,
         metavar="PATH",
         default="",
@@ -131,7 +173,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "-yt-mlabel",
-        "--tst-label-path",
+        "--test-label-path",
         type=str,
         metavar="PATH",
         default="",
@@ -139,7 +181,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "-yt-mclass",
-        "--tst-class-path",
+        "--test-class-path",
         type=str,
         metavar="PATH",
         default="",
@@ -353,6 +395,13 @@ def parse_arguments():
              "The scheme to initialize the weights when freezing mclass head. "
              "Use only in development (convenient sweeping)."
              "This will OVERWRITE --init-scheme-mclass-head AND --freeze-mclass-head-range",
+    )
+    parser.add_argument(
+        "--include-Xval-Xtest-for-training",
+        type=str_to_bool,
+        default=False,
+        help="For multi-task setting: Whether to include Xval and Xtest to backpropagate mlabel loss when training. "
+             "Only the target of mclass is kept out for validation and testing. Transductive. true/yes or false/no",
     )
     parser.add_argument(
         "--cache-dir",
@@ -671,26 +720,47 @@ def do_train(args):
         Y_trn_mclass = np.load(args.trn_class_path)
         LOGGER.info("Loaded training classes array with shape={}".format(Y_trn_mclass.shape))
 
-    # Load test feature if given
-    if args.tst_feat_path:
-        X_tst = smat_util.load_matrix(args.tst_feat_path, dtype=np.float32)
-        LOGGER.info("Loaded test feature matrix with shape={}".format(X_tst.shape))
+    # Load val feature if given
+    if args.val_feat_path:
+        X_val = smat_util.load_matrix(args.val_feat_path, dtype=np.float32)
+        LOGGER.info("Loaded val feature matrix with shape={}".format(X_val.shape))
     else:
-        X_tst = None
+        X_val = None
+
+    # Load val labels if given
+    if args.val_label_path:
+        Y_val_mlabel = smat_util.load_matrix(args.val_label_path, dtype=np.float32)
+        LOGGER.info("Loaded val label matrix with shape={}".format(Y_val_mlabel.shape))
+    else:
+        Y_val_mlabel = None
+
+    # Load val classes if given
+    if args.val_class_path:
+        Y_val_mclass = smat_util.load_matrix(args.val_class_path, dtype=np.float32)
+        LOGGER.info("Loaded val class matrix with shape={}".format(Y_val_mclass.shape))
+    else:
+        Y_val_mclass = None
+
+    # Load test feature if given
+    if args.test_feat_path:
+        X_test = smat_util.load_matrix(args.test_feat_path, dtype=np.float32)
+        LOGGER.info("Loaded test feature matrix with shape={}".format(X_test.shape))
+    else:
+        X_test = None
 
     # Load test labels if given
-    if args.tst_label_path:
-        Y_tst_mlabel = smat_util.load_matrix(args.tst_label_path, dtype=np.float32)
-        LOGGER.info("Loaded test label matrix with shape={}".format(Y_tst_mlabel.shape))
+    if args.test_label_path:
+        Y_test_mlabel = smat_util.load_matrix(args.test_label_path, dtype=np.float32)
+        LOGGER.info("Loaded test label matrix with shape={}".format(Y_test_mlabel.shape))
     else:
-        Y_tst_mlabel = None
+        Y_test_mlabel = None
 
     # Load test classes if given
-    if args.tst_class_path:
-        Y_tst_mclass = smat_util.load_matrix(args.tst_class_path, dtype=np.float32)
-        LOGGER.info("Loaded test class matrix with shape={}".format(Y_tst_mclass.shape))
+    if args.test_class_path:
+        Y_test_mclass = smat_util.load_matrix(args.test_class_path, dtype=np.float32)
+        LOGGER.info("Loaded test class matrix with shape={}".format(Y_test_mclass.shape))
     else:
-        Y_tst_mclass = None
+        Y_test_mclass = None
 
     # Load training texts
     trn_corpus = Preprocessor.load_data_from_file(
@@ -700,16 +770,27 @@ def do_train(args):
     )["corpus"]
     LOGGER.info("Loaded {} training sequences".format(len(trn_corpus)))
 
-    # Load test text if given
-    if args.tst_text_path:
-        tst_corpus = Preprocessor.load_data_from_file(
-            args.tst_text_path,
+    # Load val text if given
+    if args.val_text_path:
+        val_corpus = Preprocessor.load_data_from_file(
+            args.val_text_path,
             label_text_path=None,
             text_pos=0,
         )["corpus"]
-        LOGGER.info("Loaded {} test sequences".format(len(tst_corpus)))
+        LOGGER.info("Loaded {} val sequences".format(len(val_corpus)))
     else:
-        tst_corpus = None
+        val_corpus = None
+
+    # Load test text if given
+    if args.test_text_path:
+        test_corpus = Preprocessor.load_data_from_file(
+            args.test_text_path,
+            label_text_path=None,
+            text_pos=0,
+        )["corpus"]
+        LOGGER.info("Loaded {} test sequences".format(len(test_corpus)))
+    else:
+        test_corpus = None
 
     # load cluster chain or label features
     cluster_chain, label_feat = None, None
@@ -731,16 +812,38 @@ def do_train(args):
 
     if args.trn_class_path is not None and args.trn_label_path:
         # This is a multi-task problem
-        trn_prob = MLMultiTaskProblemWithText(trn_corpus, Y_class=Y_trn_mclass, Y_label=Y_trn_mlabel, X_feat=X_trn)
-        if all(v is not None for v in [tst_corpus, Y_tst_mlabel]):
-            val_prob = MLMultiTaskProblemWithText(tst_corpus, Y_class=Y_tst_mclass, Y_label=Y_tst_mlabel, X_feat=X_tst)
+        if args.include_Xval_Xtest_for_training:
+            # Include val and test to the training data, except for the mclass target
+            trn_corpus = trn_corpus + val_corpus + test_corpus
+            Y_trn_mclass = np.concatenate(
+                (Y_trn_mclass,
+                 np.full(shape=Y_val_mclass.shape, fill_value=np.nan),  # Do not include mclass target for val data
+                 np.full(shape=Y_test_mclass.shape, fill_value=np.nan),  # Do not include mclass target for test data
+                ),
+                axis=0)
+            Y_trn_mlabel = vstack([Y_trn_mlabel, Y_val_mlabel, Y_test_mlabel])
+            X_trn = vstack([X_trn, X_val, X_test])
+            LOGGER.info("Transductive: include features and topology of nodes in validation set and test set "
+                        "when training (i.e., only left out the mclass target)")
+            LOGGER.info("In total {} training sequences".format(len(trn_corpus)))
+            LOGGER.info("Training feature matrix shape={}".format(X_trn.shape))
+            LOGGER.info("Training classes array shape={}. In which {} are NaNs.".format(Y_trn_mclass.shape,
+                                                                                        Y_val_mclass.shape[0] +
+                                                                                        Y_test_mclass.shape[0]))
+            LOGGER.info("Training label matrix shape={}".format(Y_trn_mlabel.shape))
+            trn_prob = MLMultiTaskProblemWithText(trn_corpus, Y_class=Y_trn_mclass, Y_label=Y_trn_mlabel, X_feat=X_trn)
+        else:
+            trn_prob = MLMultiTaskProblemWithText(trn_corpus, Y_class=Y_trn_mclass, Y_label=Y_trn_mlabel, X_feat=X_trn)
+
+        if all(v is not None for v in [val_corpus, Y_val_mlabel]):
+            val_prob = MLMultiTaskProblemWithText(val_corpus, Y_class=Y_val_mclass, Y_label=Y_val_mlabel, X_feat=X_val)
         else:
             val_prob = None
     else:
         # XMC problem
         trn_prob = MLProblemWithText(trn_corpus, Y_trn_mlabel, X_feat=X_trn)
-        if all(v is not None for v in [tst_corpus, Y_tst_mlabel]):
-            val_prob = MLProblemWithText(tst_corpus, Y_tst_mlabel, X_feat=X_tst)
+        if all(v is not None for v in [val_corpus, Y_val_mlabel]):
+            val_prob = MLProblemWithText(val_corpus, Y_val_mlabel, X_feat=X_val)
         else:
             val_prob = None
 
@@ -767,6 +870,7 @@ def do_train(args):
             mclass_pred_hyperparam=mclass_pred_hyperparam,
             freeze_mclass_head_range=args.freeze_mclass_head_range,
             init_scheme_mclass_head=args.init_scheme_mclass_head,
+            include_Xval_Xtest_for_training=args.include_Xval_Xtest_for_training,
         )
     else:
         # XMC problem

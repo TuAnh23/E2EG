@@ -2506,7 +2506,8 @@ class TransformerMultiTask(pecos.BaseClass):
         return X_cat
 
     def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None,
-                          finetune_round_th=None, mclass_weight=1, additional_mclass_round=False):
+                          finetune_round_th=None, mclass_weight=1, additional_mclass_round=False,
+                          include_Xval_Xtest_for_training=False):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2723,9 +2724,16 @@ class TransformerMultiTask(pecos.BaseClass):
                     label_embedding=(text_model_W_seq, text_model_b_seq),
                 )
                 loss_mlabel = loss_function_mlabel(outputs["logits_mlabel"], inputs["label_values"].to(self.device))
-                loss_mclass = loss_function_mclass(outputs["logits_mclass"],
-                                                   inputs["class_value"].to(self.device)
-                                                   ) * mclass_weight
+                if include_Xval_Xtest_for_training:
+                    # Exclude the samples with NaN target from loss calculation
+                    not_nan_sample_idx = ~torch.isnan(inputs['class_value'])
+                    loss_mclass = loss_function_mclass(outputs["logits_mclass"][not_nan_sample_idx],
+                                                       inputs["class_value"][not_nan_sample_idx].type(torch.LongTensor).to(self.device)
+                                                       ) * mclass_weight
+                else:
+                    loss_mclass = loss_function_mclass(outputs["logits_mclass"],
+                                                       inputs["class_value"].to(self.device)
+                                                       ) * mclass_weight
 
                 loss_mlabel = loss_mlabel.mean()  # mean() to average on multi-gpu parallel training
                 loss_mclass = loss_mclass.mean()  # mean() to average on multi-gpu parallel training
@@ -2914,6 +2922,7 @@ class TransformerMultiTask(pecos.BaseClass):
         mclass_pred_hyperparam=None,
         freeze_mclass_head=False,
         init_scheme_mclass_head=None,
+        include_Xval_Xtest_for_training=False,
         additional_mclass_round=False,
         **kwargs,
     ):
@@ -2969,7 +2978,7 @@ class TransformerMultiTask(pecos.BaseClass):
             train_params.checkpoint_dir = f"{model_dir}/round{finetune_round_th}"
 
         if train_params.init_model_dir:
-            matcher = cls.load(train_params.init_model_dir, num_classes=prob.Y_class.max() + 1)
+            matcher = cls.load(train_params.init_model_dir, num_classes=int(np.nanmax(prob.Y_class) + 1))
             LOGGER.info("Loaded model from {}.".format(train_params.init_model_dir))
             if prob.Y_label.shape[1] != matcher.nr_labels:
                 LOGGER.warning(
@@ -2982,7 +2991,7 @@ class TransformerMultiTask(pecos.BaseClass):
         else:
             matcher = cls.download_model(
                 train_params.model_shortcut,
-                num_classes=prob.Y_class.max() + 1,
+                num_classes=int(np.nanmax(prob.Y_class) + 1),
                 num_labels=prob.Y_label.shape[1],
                 hidden_dropout_prob=train_params.hidden_dropout_prob,
                 cache_dir=train_params.cache_dir,
@@ -3069,12 +3078,13 @@ class TransformerMultiTask(pecos.BaseClass):
             LOGGER.info("Start fine-tuning transformer matcher...")
             matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes,
                                       finetune_round_th=finetune_round_th, mclass_weight=mclass_weight,
-                                      additional_mclass_round=additional_mclass_round)
+                                      additional_mclass_round=additional_mclass_round,
+                                      include_Xval_Xtest_for_training=include_Xval_Xtest_for_training)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
                 )
-                matcher = TransformerMultiTask.load(train_params.checkpoint_dir, num_classes=prob.Y_class.max() + 1,
+                matcher = TransformerMultiTask.load(train_params.checkpoint_dir, num_classes=int(np.nanmax(prob.Y_class) + 1),
                                                     mclass_pred_hyperparam=mclass_pred_hyperparam,
                                                     freeze_mclass_head=freeze_mclass_head)
                 matcher.to_device(device, n_gpu)

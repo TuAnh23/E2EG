@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
-#SBATCH --time=04-00:00:00
+#SBATCH --time=01-00:00:00
 #SBATCH --mem=62500M
 #SBATCH --output=slurm_output_%A.out
 
@@ -20,7 +20,7 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=giant_reduce
+experiment_name=multi_task_transductive
 # Download data
 cd data/proc_data_multi_task
 dataset=ogbn-arxiv
@@ -59,6 +59,6 @@ runs=5
 # No matter what happens, we copy the temp output folders back to our login node
 trap 'cp -r ${model_dir} $HOME/UvA_Thesis_pecosEXT/models; cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments; cp -r ${cache_dir} $HOME/UvA_Thesis_pecosEXT/models;' EXIT
 # Run train-val-test pipeline
-params_path=data/proc_data_multi_task/params_xrt_${dataset}.json
-bash GIANT_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
+params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
+bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
 #bash hyperparams_sweep.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} sweep_configs/${experiment_name}

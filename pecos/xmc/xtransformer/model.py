@@ -932,6 +932,7 @@ class XTransformerMultiTask(pecos.BaseClass):
         mclass_pred_hyperparam=None,
         freeze_mclass_head_range=None,
         init_scheme_mclass_head=None,
+        include_Xval_Xtest_for_training=False,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1264,6 +1265,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     mclass_pred_hyperparam=mclass_pred_hyperparam,
                     freeze_mclass_head=freeze_mclass_head,
                     init_scheme_mclass_head=init_scheme_mclass_head,
+                    include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
                     additional_mclass_round=additional_mclass_round,
                 )
                 parent_model = res_dict["matcher"]

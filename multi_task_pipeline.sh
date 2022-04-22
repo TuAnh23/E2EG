@@ -64,10 +64,14 @@ do
       --trn-feat-path ${X_trn_npz_path} \
       --trn-label-path ${Y_trn_neighbor_path} \
       --trn-class-path ${Y_trn_main_path} \
-      --tst-text-path ${X_val_txt_path} \
-      --tst-feat-path ${X_val_npz_path} \
-      --tst-label-path ${Y_val_neighbor_path} \
-      --tst-class-path ${Y_val_main_path} \
+      --val-text-path ${X_val_txt_path} \
+      --val-feat-path ${X_val_npz_path} \
+      --val-label-path ${Y_val_neighbor_path} \
+      --val-class-path ${Y_val_main_path} \
+      --test-text-path ${X_test_txt_path} \
+      --test-feat-path ${X_test_npz_path} \
+      --test-label-path ${Y_test_neighbor_path} \
+      --test-class-path ${Y_test_main_path} \
       --model-dir ${model_dir}/run${seed} \
       --experiment-dir ${experiment_dir}/run${seed} \
       --cache-dir ${cache_dir} \
@@ -82,6 +86,7 @@ do
       --mclass-pred-batchnorm "yes" \
       --mclass-pred-hidden-size 256 \
       --freeze-mclass-head-range "0|2" \
+      --include-Xval-Xtest-for-training true \
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================
