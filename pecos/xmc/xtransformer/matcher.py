@@ -3159,7 +3159,13 @@ class TransformerMultiTask(pecos.BaseClass):
             train_type = "man" if csr_codes is not None else "all"
             train_metrics_mlabel = smat_util.MetricsMLabel.generate(prob.Y_label, P_label_trn,
                                                                     topk=pred_params.only_topk)
-            train_metrics_mclass = smat_util.MetricsMClass.generate(prob.Y_class, P_class_trn.argmax(axis=1))
+            if include_Xval_Xtest_for_training:
+                # Only calculate the accuracy on the train split with given mclass target
+                non_nan_idx = ~np.isnan(prob.Y_class)
+                train_metrics_mclass = smat_util.MetricsMClass.generate(prob.Y_class[non_nan_idx].astype(int, copy=False),
+                                                                        P_class_trn.argmax(axis=1)[non_nan_idx])
+            else:
+                train_metrics_mclass = smat_util.MetricsMClass.generate(prob.Y_class, P_class_trn.argmax(axis=1))
             avr_train_beam = (
                 1 if csr_codes is None else csr_codes.nnz / csr_codes.shape[0]
             )
