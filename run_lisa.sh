@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --partition=gpu_shared
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:3
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
-#SBATCH --time=01-00:00:00
-#SBATCH --mem=62500M
+#SBATCH --time=00-12:00:00
+#SBATCH --mem=96000M
 #SBATCH --output=slurm_output_%A.out
 
 nvidia-smi
@@ -20,7 +20,7 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=multi_task_transductive
+experiment_name=multi_task_transductive_weightLoss2_longerLast
 # Download data
 cd data/proc_data_multi_task
 dataset=ogbn-arxiv
@@ -55,7 +55,7 @@ data_dir=${tmp_dir}/data/proc_data_multi_task/${dataset}
 model_dir=${tmp_dir}/models/${experiment_name}
 experiment_dir=${tmp_dir}/experiments/${experiment_name}
 cache_dir=${tmp_dir}/models/cache
-runs=5
+runs=1
 # No matter what happens, we copy the temp output folders back to our login node
 trap 'cp -r ${model_dir} $HOME/UvA_Thesis_pecosEXT/models; cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments; cp -r ${cache_dir} $HOME/UvA_Thesis_pecosEXT/models;' EXIT
 # Run train-val-test pipeline

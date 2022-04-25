@@ -404,6 +404,22 @@ def parse_arguments():
              "Only the target of mclass is kept out for validation and testing. Transductive. true/yes or false/no",
     )
     parser.add_argument(
+        "--include-additional-mclass-round",
+        type=str_to_bool,
+        default=False,
+        help="For multi-task: Whether to include an additional fine-tuning round only on mclass task in the end "
+             "if the last multi-task round has the best val acc."
+             "true/yes or false/no",
+    )
+    parser.add_argument(
+        "--train-last-mtask-longer",
+        type=str_to_bool,
+        default=False,
+        help="For multi-task: if set to True, when obtain the best val acc after the first epoch of the last round, "
+             "continue training the last multi-task round for longer until val acc stop increasing."
+             "true/yes or false/no",
+    )
+    parser.add_argument(
         "--cache-dir",
         default="",
         metavar="PATH",
@@ -651,6 +667,7 @@ def do_train(args):
               "mclass_pred_hidden_size": args.mclass_pred_hidden_size,
               "freeze_mclass_head_range": args.freeze_mclass_head_range,
               "init_scheme_mclass_head": args.init_scheme_mclass_head,
+              "train_last_mtask_longer": args.train_last_mtask_longer,
               }
 
     LOGGER.info(f"Manual configuration: {config}")
@@ -871,6 +888,8 @@ def do_train(args):
             freeze_mclass_head_range=args.freeze_mclass_head_range,
             init_scheme_mclass_head=args.init_scheme_mclass_head,
             include_Xval_Xtest_for_training=args.include_Xval_Xtest_for_training,
+            include_additional_mclass_round=args.include_additional_mclass_round,
+            train_last_mtask_longer=args.train_last_mtask_longer,
         )
     else:
         # XMC problem

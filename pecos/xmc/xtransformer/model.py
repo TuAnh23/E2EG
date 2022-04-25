@@ -933,6 +933,8 @@ class XTransformerMultiTask(pecos.BaseClass):
         freeze_mclass_head_range=None,
         init_scheme_mclass_head=None,
         include_Xval_Xtest_for_training=False,
+        include_additional_mclass_round=False,
+        train_last_mtask_longer=False,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1110,7 +1112,8 @@ class XTransformerMultiTask(pecos.BaseClass):
             M, val_M = None, None
             M_pred, val_M_pred = None, None
             bootstrapping, inst_embeddings = None, None
-            for i in range(nr_transformers+1):
+
+            for i in range(nr_transformers):
                 if i == nr_transformers:
                     # This is the additional round for mclass
                     additional_mclass_round = True
@@ -1119,7 +1122,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     # Check if the last round has the best validation accuracy
                     # if not, then model already overfit, no need to run this additional round
                     _, best_round_index, _ = extract_train_performance_logs(experiment_dir)
-                    if best_round_index < nr_transformers-1:
+                    if best_round_index < nr_transformers-1 or (not include_additional_mclass_round):
                         break
                     # Set incompatible variables from the mlabel task. We do not need mlabel anyway
                     M, val_M = None, None
@@ -1127,6 +1130,12 @@ class XTransformerMultiTask(pecos.BaseClass):
                 else:
                     additional_mclass_round = False
                     level_i = i
+
+                if i == nr_transformers - 1:
+                    # This is the last multi-task round
+                    last_mtask = True
+                else:
+                    last_mtask = False
 
                 cur_train_params = train_params.matcher_params_chain[level_i]
                 cur_pred_params = pred_params.matcher_params_chain[level_i]
@@ -1267,6 +1276,8 @@ class XTransformerMultiTask(pecos.BaseClass):
                     init_scheme_mclass_head=init_scheme_mclass_head,
                     include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
                     additional_mclass_round=additional_mclass_round,
+                    train_last_mtask_longer=train_last_mtask_longer,
+                    last_mtask=last_mtask,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred_label"]

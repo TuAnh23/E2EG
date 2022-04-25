@@ -33,6 +33,8 @@ from .module import XMCDataset, MultiTaskDataset
 from .network import ENCODER_CLASSES, HingeLoss, TransformerLinearXMCHead
 from huggingface_hub import hf_hub_download
 
+from .final_metrics_collection import extract_train_performance_logs
+
 logging.getLogger(transformers.__name__).setLevel(logging.WARNING)
 
 LOGGER = logging.getLogger(__name__)
@@ -2507,7 +2509,8 @@ class TransformerMultiTask(pecos.BaseClass):
 
     def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None,
                           finetune_round_th=None, mclass_weight=1, additional_mclass_round=False,
-                          include_Xval_Xtest_for_training=False):
+                          include_Xval_Xtest_for_training=False, experiment_dir="", train_last_mtask_longer=False,
+                          last_mtask=False):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2524,15 +2527,6 @@ class TransformerMultiTask(pecos.BaseClass):
         train_params = self.train_params
         pred_params = self.pred_params
 
-        if additional_mclass_round:
-            # Set up constantly saving and early stopping
-            train_params.save_steps = 500
-            train_params.max_steps = 25000
-            train_params.max_no_improve_cnt = 5
-        else:
-            # No need to perform evaluation in the middle of the training process, unless it is the last mclass round
-            val_prob = None
-
         loss_function_mlabel = TransformerMultiTask.get_loss_function_mlabel(train_params.loss_function_mlabel).to(
             self.device
         )
@@ -2541,10 +2535,6 @@ class TransformerMultiTask(pecos.BaseClass):
             self.device
         )
 
-        max_act_labels = train_params.max_active_matching_labels
-        logging_steps = train_params.logging_steps
-        max_steps = train_params.max_steps
-        max_no_improve_cnt = train_params.max_no_improve_cnt
         if prob.M is not None:
             # need to keep explicit zeros in csr_codes_next
             # therefore do not pass it through constructor
@@ -2558,7 +2548,7 @@ class TransformerMultiTask(pecos.BaseClass):
                 threads=train_params.batch_gen_workers,
             )
 
-            do_resample = max_act_labels is not None and max_act_labels < max(
+            do_resample = train_params.max_active_matching_labels is not None and train_params.max_active_matching_labels < max(
                 M_next.indptr[1:] - M_next.indptr[:-1]
             )
         else:
@@ -2573,7 +2563,7 @@ class TransformerMultiTask(pecos.BaseClass):
             M_next,
             prob.Y_label,
             idx_padding=self.text_model.label_pad,
-            max_labels=max_act_labels,
+            max_labels=train_params.max_active_matching_labels,
         )
         train_data = MultiTaskDataset(
             prob.X_text["input_ids"],
@@ -2594,6 +2584,23 @@ class TransformerMultiTask(pecos.BaseClass):
             batch_size=train_params.batch_size,
             num_workers=train_params.batch_gen_workers,
         )
+
+        if additional_mclass_round:
+            # Set up constantly saving and early stopping
+            train_params.save_steps = 500
+            train_params.max_steps = 25000
+            train_params.max_no_improve_cnt = 5
+
+        if last_mtask and train_last_mtask_longer:
+            # This is the last multi-task round, we continue training it until val acc stop decreasing
+            steps_per_epoch = len(train_dataloader) // train_params.gradient_accumulation_steps
+            train_params.save_steps = steps_per_epoch  # Save after every epoch
+            train_params.max_steps = 99999
+            train_params.max_no_improve_cnt = 1
+
+        if (not additional_mclass_round) and (not (last_mtask and train_last_mtask_longer)):
+            # No need to perform evaluation in the middle of the training process
+            val_prob = None
 
         # compute stopping criteria
         if train_params.max_steps > 0:
@@ -2679,6 +2686,7 @@ class TransformerMultiTask(pecos.BaseClass):
         best_matcher_acc = -1
         avg_matcher_val_prec_mlabel = 0
         val_acc_mclass = 0
+        stop_training = False
         save_cur_model = False
         no_improve_cnt = 0
 
@@ -2769,9 +2777,9 @@ class TransformerMultiTask(pecos.BaseClass):
                     emb_optimizer.zero_grad()  # clear gradient accumulation
                     global_step += 1
 
-                    if logging_steps > 0 and global_step % logging_steps == 0:
-                        cur_loss_mlabel = (tr_loss_mlabel - logging_loss_mlabel) / logging_steps
-                        cur_loss_mclass = (tr_loss_mclass - logging_loss_mclass) / logging_steps
+                    if train_params.logging_steps > 0 and global_step % train_params.logging_steps == 0:
+                        cur_loss_mlabel = (tr_loss_mlabel - logging_loss_mlabel) / train_params.logging_steps
+                        cur_loss_mclass = (tr_loss_mclass - logging_loss_mclass) / train_params.logging_steps
                         LOGGER.info(
                             "| [{:4d}/{:4d}][{:6d}/{:6d}] | {:4d}/{:4d} batches | ms/batch {:5.4f} | train_loss_mlabel {:6e} | train_loss_mclass {:6e} | lr {:.6e}".format(
                                 int(epoch),
@@ -2780,7 +2788,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                 int(t_total),
                                 int(batch_cnt),
                                 len(train_dataloader),
-                                logging_elapsed * 1000.0 / logging_steps,
+                                logging_elapsed * 1000.0 / train_params.logging_steps,
                                 cur_loss_mlabel,
                                 cur_loss_mclass,
                                 scheduler.get_last_lr()[0],
@@ -2865,6 +2873,14 @@ class TransformerMultiTask(pecos.BaseClass):
 
                             # save the model with highest val accuracy on the multi-class classification task
                             save_cur_model = val_acc_mclass > best_matcher_acc
+
+                            if last_mtask and train_last_mtask_longer and best_matcher_acc == -1:
+                                # This is the end of the first epoch in the last multi-task round
+                                # Check if the val acc is better than all the val accs at previous rounds
+                                # If not then stop training, since we're already overfitting
+                                prev_round_best_val_acc, _, _ = extract_train_performance_logs(experiment_dir)
+                                if val_acc_mclass < prev_round_best_val_acc:
+                                    stop_training = True
                         else:
                             # if val set not given, always save
                             save_cur_model = True
@@ -2894,13 +2910,13 @@ class TransformerMultiTask(pecos.BaseClass):
                             no_improve_cnt += 1
                         LOGGER.info("-" * 89)
 
-                if (max_steps > 0 and global_step > max_steps) or (
-                    max_no_improve_cnt > 0 and no_improve_cnt >= max_no_improve_cnt
-                ):
+                if (train_params.max_steps > 0 and global_step > train_params.max_steps) or (
+                    train_params.max_no_improve_cnt > 0 and no_improve_cnt >= train_params.max_no_improve_cnt
+                ) or stop_training:
                     break
-            if (max_steps > 0 and global_step > max_steps) or (
-                max_no_improve_cnt > 0 and no_improve_cnt >= max_no_improve_cnt
-            ):
+            if (train_params.max_steps > 0 and global_step > train_params.max_steps) or (
+                train_params.max_no_improve_cnt > 0 and no_improve_cnt >= train_params.max_no_improve_cnt
+            ) or stop_training:
                 break
 
         return self
@@ -2924,6 +2940,8 @@ class TransformerMultiTask(pecos.BaseClass):
         init_scheme_mclass_head=None,
         include_Xval_Xtest_for_training=False,
         additional_mclass_round=False,
+        train_last_mtask_longer=False,
+        last_mtask=False,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -3079,7 +3097,9 @@ class TransformerMultiTask(pecos.BaseClass):
             matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes,
                                       finetune_round_th=finetune_round_th, mclass_weight=mclass_weight,
                                       additional_mclass_round=additional_mclass_round,
-                                      include_Xval_Xtest_for_training=include_Xval_Xtest_for_training)
+                                      include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
+                                      experiment_dir=experiment_dir, train_last_mtask_longer=train_last_mtask_longer,
+                                      last_mtask=last_mtask)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
