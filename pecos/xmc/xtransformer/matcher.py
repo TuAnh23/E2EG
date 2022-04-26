@@ -12,6 +12,7 @@ import copy
 import gc
 import json
 import logging
+import math
 import os
 import tempfile
 import time
@@ -2757,10 +2758,16 @@ class TransformerMultiTask(pecos.BaseClass):
                     loss_mlabel = loss_mlabel / train_params.gradient_accumulation_steps
                     loss_mclass = loss_mclass / train_params.gradient_accumulation_steps
 
-                # Dont backpropagate the mlabel loss in the additional round
-                if not additional_mclass_round:
-                    loss_mlabel.backward(retain_graph=True)
-                loss_mclass.backward()
+                if math.isclose(mclass_weight, 0):
+                    # Don't backpropagate the mclass loss
+                    if not additional_mclass_round:
+                        # Dont backpropagate the mlabel loss in the additional round
+                        loss_mlabel.backward()
+                else:
+                    if not additional_mclass_round:
+                        # Dont backpropagate the mlabel loss in the additional round
+                        loss_mlabel.backward(retain_graph=True)
+                    loss_mclass.backward()
 
                 tr_loss_mlabel += loss_mlabel.item()
                 tr_loss_mclass += loss_mclass.item()
