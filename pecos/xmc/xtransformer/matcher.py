@@ -2587,15 +2587,16 @@ class TransformerMultiTask(pecos.BaseClass):
 
         if additional_mclass_round:
             # Set up constantly saving and early stopping
-            train_params.save_steps = 500
-            train_params.max_steps = 25000
-            train_params.max_no_improve_cnt = 5
+            steps_per_epoch = len(train_dataloader) // train_params.gradient_accumulation_steps
+            train_params.save_steps = steps_per_epoch
+            train_params.max_steps = steps_per_epoch * 3
+            train_params.max_no_improve_cnt = 1
 
         if last_mtask and train_last_mtask_longer:
             # This is the last multi-task round, we continue training it until val acc stop decreasing
             steps_per_epoch = len(train_dataloader) // train_params.gradient_accumulation_steps
             train_params.save_steps = steps_per_epoch  # Save after every epoch
-            train_params.max_steps = 99999
+            train_params.max_steps = steps_per_epoch * 3
             train_params.max_no_improve_cnt = 1
 
         if (not additional_mclass_round) and (not (last_mtask and train_last_mtask_longer)):

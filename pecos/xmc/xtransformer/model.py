@@ -1113,7 +1113,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             M_pred, val_M_pred = None, None
             bootstrapping, inst_embeddings = None, None
 
-            for i in range(nr_transformers):
+            for i in range(nr_transformers + 1):
                 if i == nr_transformers:
                     # This is the additional round for mclass
                     additional_mclass_round = True

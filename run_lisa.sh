@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --partition=gpu_shared
-#SBATCH --gres=gpu:3
+#SBATCH --gres=gpu:2
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
 #SBATCH --time=00-12:00:00
-#SBATCH --mem=96000M
+#SBATCH --mem=120000M
 #SBATCH --output=slurm_output_%A.out
 
 nvidia-smi

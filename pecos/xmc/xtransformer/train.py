@@ -668,6 +668,7 @@ def do_train(args):
               "freeze_mclass_head_range": args.freeze_mclass_head_range,
               "init_scheme_mclass_head": args.init_scheme_mclass_head,
               "train_last_mtask_longer": args.train_last_mtask_longer,
+              "include_additional_mclass_round": args.include_additional_mclass_round,
               }
 
     LOGGER.info(f"Manual configuration: {config}")
