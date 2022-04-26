@@ -5,7 +5,7 @@
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
 #SBATCH --time=00-12:00:00
-#SBATCH --mem=96000M
+#SBATCH --mem=90000M
 #SBATCH --output=slurm_output_%A.out
 
 nvidia-smi
@@ -57,7 +57,7 @@ experiment_dir=${tmp_dir}/experiments/${experiment_name}
 cache_dir=${tmp_dir}/models/cache
 runs=1
 # No matter what happens, we copy the temp output folders back to our login node
-trap 'cp -r ${model_dir} $HOME/UvA_Thesis_pecosEXT/models; cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments; cp -r ${cache_dir} $HOME/UvA_Thesis_pecosEXT/models;' EXIT
+trap 'cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments; cp -r ${model_dir} $HOME/UvA_Thesis_pecosEXT/models; cp -r ${cache_dir} $HOME/UvA_Thesis_pecosEXT/models;' EXIT
 # Run train-val-test pipeline
 params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
 bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}

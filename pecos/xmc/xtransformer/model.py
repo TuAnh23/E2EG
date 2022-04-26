@@ -1114,24 +1114,38 @@ class XTransformerMultiTask(pecos.BaseClass):
             M_pred, val_M_pred = None, None
             bootstrapping, inst_embeddings = None, None
 
-            for i in range(nr_transformers + 1):
+            if include_additional_mclass_round or include_additional_mclass_round_HEAD or train_last_mtask_longer:
+                # In these setting, if the last multi-task round with the most detailed neighborhood has the best
+                # val acc, we continue training additional rounds to avoid underfitting on the mclass task
+                max_nr_rounds = nr_transformers + 20
+            else:
+                max_nr_rounds = nr_transformers
+            for i in range(max_nr_rounds):
                 freeze_BERT = False
-                if i == nr_transformers:
-                    # This is the additional round for mclass
+                include_mlabel = True
+                if i >= nr_transformers:
+                    # This is the additional round
                     additional_mclass_round = True
                     # Set the level of mlabel to be the last level
-                    level_i = i - 1
-                    # Check if the last round has the best validation accuracy
-                    # if not, then model already overfit, no need to run this additional round
-                    _, best_round_index, _ = extract_train_performance_logs(experiment_dir)
-                    if best_round_index < nr_transformers-1 or \
-                            (not (include_additional_mclass_round or include_additional_mclass_round_HEAD)):
-                        break
+                    level_i = nr_transformers - 1
+                    # Check which of the previous round has the best validation accuracy
+                    _, best_round_prev, _ = extract_train_performance_logs(experiment_dir)
+
+                    if include_additional_mclass_round_HEAD or include_additional_mclass_round:
+                        # Do not backprop the mlabel task in these settings
+                        include_mlabel = False
+
                     if include_additional_mclass_round_HEAD:
                         freeze_BERT = True
-                    # Set incompatible variables from the mlabel task. We do not need mlabel anyway
-                    M, val_M = None, None
-                    M_pred, val_M_pred = None, None
+                        # In this setting, BERT is freezed, so it train faster
+                        # We can set a high patient
+                        patient = 5
+                    else:
+                        patient = 1
+
+                    if best_round_prev < i - patient:
+                        break
+
                 else:
                     additional_mclass_round = False
                     level_i = i
@@ -1281,13 +1295,14 @@ class XTransformerMultiTask(pecos.BaseClass):
                     init_scheme_mclass_head=init_scheme_mclass_head,
                     include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
                     additional_mclass_round=additional_mclass_round,
-                    train_last_mtask_longer=train_last_mtask_longer,
-                    last_mtask=last_mtask,
                     freeze_BERT=freeze_BERT,
+                    include_mlabel=include_mlabel,
                 )
                 parent_model = res_dict["matcher"]
-                M_pred = res_dict["trn_pred_label"]
-                val_M_pred = res_dict["val_pred_label"]
+                if i < nr_transformers - 1:
+                    # No need to update these for the additional rounds
+                    M_pred = res_dict["trn_pred_label"]
+                    val_M_pred = res_dict["val_pred_label"]
                 inst_embeddings = res_dict["trn_embeddings"]
                 val_inst_embeddings = res_dict["val_embeddings"]
 

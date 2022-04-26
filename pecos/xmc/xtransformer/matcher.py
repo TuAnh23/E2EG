@@ -2509,9 +2509,8 @@ class TransformerMultiTask(pecos.BaseClass):
         return X_cat
 
     def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None,
-                          finetune_round_th=None, mclass_weight=1, additional_mclass_round=False,
-                          include_Xval_Xtest_for_training=False, experiment_dir="", train_last_mtask_longer=False,
-                          last_mtask=False, freeze_BERT=False):
+                          finetune_round_th=None, mclass_weight=1,
+                          include_Xval_Xtest_for_training=False, include_mlabel=True):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2585,30 +2584,6 @@ class TransformerMultiTask(pecos.BaseClass):
             batch_size=train_params.batch_size,
             num_workers=train_params.batch_gen_workers,
         )
-
-        if additional_mclass_round:
-            # Set up constantly saving and early stopping
-            steps_per_epoch = len(train_dataloader) // train_params.gradient_accumulation_steps
-            if freeze_BERT:
-                # We can train for longer if BERT is freezed
-                train_params.save_steps = steps_per_epoch
-                train_params.max_steps = steps_per_epoch * 20
-                train_params.max_no_improve_cnt = 5
-            else:
-                train_params.save_steps = steps_per_epoch
-                train_params.max_steps = steps_per_epoch * 3
-                train_params.max_no_improve_cnt = 1
-
-        if last_mtask and train_last_mtask_longer:
-            # This is the last multi-task round, we continue training it until val acc stop decreasing
-            steps_per_epoch = len(train_dataloader) // train_params.gradient_accumulation_steps
-            train_params.save_steps = steps_per_epoch  # Save after every epoch
-            train_params.max_steps = steps_per_epoch * 3
-            train_params.max_no_improve_cnt = 1
-
-        if (not additional_mclass_round) and (not (last_mtask and train_last_mtask_longer)):
-            # No need to perform evaluation in the middle of the training process
-            val_prob = None
 
         # compute stopping criteria
         if train_params.max_steps > 0:
@@ -2694,7 +2669,6 @@ class TransformerMultiTask(pecos.BaseClass):
         best_matcher_acc = -1
         avg_matcher_val_prec_mlabel = 0
         val_acc_mclass = 0
-        stop_training = False
         save_cur_model = False
         no_improve_cnt = 0
 
@@ -2760,12 +2734,10 @@ class TransformerMultiTask(pecos.BaseClass):
 
                 if math.isclose(mclass_weight, 0):
                     # Don't backpropagate the mclass loss
-                    if not additional_mclass_round:
-                        # Dont backpropagate the mlabel loss in the additional round
+                    if include_mlabel:
                         loss_mlabel.backward()
                 else:
-                    if not additional_mclass_round:
-                        # Dont backpropagate the mlabel loss in the additional round
+                    if include_mlabel:
                         loss_mlabel.backward(retain_graph=True)
                     loss_mclass.backward()
 
@@ -2888,13 +2860,6 @@ class TransformerMultiTask(pecos.BaseClass):
                             # save the model with highest val accuracy on the multi-class classification task
                             save_cur_model = val_acc_mclass > best_matcher_acc
 
-                            if last_mtask and train_last_mtask_longer and best_matcher_acc == -1:
-                                # This is the end of the first epoch in the last multi-task round
-                                # Check if the val acc is better than all the val accs at previous rounds
-                                # If not then stop training, since we're already overfitting
-                                prev_round_best_val_acc, _, _ = extract_train_performance_logs(experiment_dir)
-                                if val_acc_mclass < prev_round_best_val_acc:
-                                    stop_training = True
                         else:
                             # if val set not given, always save
                             save_cur_model = True
@@ -2926,11 +2891,11 @@ class TransformerMultiTask(pecos.BaseClass):
 
                 if (train_params.max_steps > 0 and global_step > train_params.max_steps) or (
                     train_params.max_no_improve_cnt > 0 and no_improve_cnt >= train_params.max_no_improve_cnt
-                ) or stop_training:
+                ):
                     break
             if (train_params.max_steps > 0 and global_step > train_params.max_steps) or (
                 train_params.max_no_improve_cnt > 0 and no_improve_cnt >= train_params.max_no_improve_cnt
-            ) or stop_training:
+            ):
                 break
 
         return self
@@ -2954,9 +2919,8 @@ class TransformerMultiTask(pecos.BaseClass):
         init_scheme_mclass_head=None,
         include_Xval_Xtest_for_training=False,
         additional_mclass_round=False,
-        train_last_mtask_longer=False,
-        last_mtask=False,
         freeze_BERT=False,
+        include_mlabel=True,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -3113,12 +3077,11 @@ class TransformerMultiTask(pecos.BaseClass):
         # train the matcher
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:
             LOGGER.info("Start fine-tuning transformer matcher...")
-            matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes,
+            # Pass val_prob=None to avoid evaluation in the middle of training loop, which leads to RAM issue
+            matcher.fine_tune_encoder(prob, val_prob=None, val_csr_codes=val_csr_codes,
                                       finetune_round_th=finetune_round_th, mclass_weight=mclass_weight,
-                                      additional_mclass_round=additional_mclass_round,
                                       include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
-                                      experiment_dir=experiment_dir, train_last_mtask_longer=train_last_mtask_longer,
-                                      last_mtask=last_mtask, freeze_BERT=freeze_BERT)
+                                      include_mlabel=include_mlabel)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
