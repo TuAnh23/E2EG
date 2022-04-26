@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --partition=gpu_shared
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH -c 6
 #SBATCH --job-name=ExampleJob
 #SBATCH --time=00-12:00:00
-#SBATCH --mem=120000M
+#SBATCH --mem=96000M
 #SBATCH --output=slurm_output_%A.out
 
 nvidia-smi
@@ -20,7 +20,7 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=multi_task_transductive_weightLoss2_longerLast
+experiment_name=multi_task_transductive_weightLoss2_3L_addFreezeBERT
 # Download data
 cd data/proc_data_multi_task
 dataset=ogbn-arxiv

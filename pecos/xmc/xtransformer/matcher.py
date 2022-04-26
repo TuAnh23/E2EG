@@ -2510,7 +2510,7 @@ class TransformerMultiTask(pecos.BaseClass):
     def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None,
                           finetune_round_th=None, mclass_weight=1, additional_mclass_round=False,
                           include_Xval_Xtest_for_training=False, experiment_dir="", train_last_mtask_longer=False,
-                          last_mtask=False):
+                          last_mtask=False, freeze_BERT=False):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2588,9 +2588,15 @@ class TransformerMultiTask(pecos.BaseClass):
         if additional_mclass_round:
             # Set up constantly saving and early stopping
             steps_per_epoch = len(train_dataloader) // train_params.gradient_accumulation_steps
-            train_params.save_steps = steps_per_epoch
-            train_params.max_steps = steps_per_epoch * 3
-            train_params.max_no_improve_cnt = 1
+            if freeze_BERT:
+                # We can train for longer if BERT is freezed
+                train_params.save_steps = steps_per_epoch
+                train_params.max_steps = steps_per_epoch * 20
+                train_params.max_no_improve_cnt = 5
+            else:
+                train_params.save_steps = steps_per_epoch
+                train_params.max_steps = steps_per_epoch * 3
+                train_params.max_no_improve_cnt = 1
 
         if last_mtask and train_last_mtask_longer:
             # This is the last multi-task round, we continue training it until val acc stop decreasing
@@ -2943,6 +2949,7 @@ class TransformerMultiTask(pecos.BaseClass):
         additional_mclass_round=False,
         train_last_mtask_longer=False,
         last_mtask=False,
+        freeze_BERT=False,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -3087,6 +3094,10 @@ class TransformerMultiTask(pecos.BaseClass):
             else:
                 raise ValueError(f"Unknown bootstrap_method: {train_params.bootstrap_method}")
 
+        if freeze_BERT:
+            for bert_param in matcher.text_encoder.bert.parameters():
+                bert_param.requires_grad = False
+
         # move matcher to desired hardware
         device, n_gpu = torch_util.setup_device(train_params.use_gpu)
         matcher.to_device(device, n_gpu)
@@ -3100,7 +3111,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                       additional_mclass_round=additional_mclass_round,
                                       include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
                                       experiment_dir=experiment_dir, train_last_mtask_longer=train_last_mtask_longer,
-                                      last_mtask=last_mtask)
+                                      last_mtask=last_mtask, freeze_BERT=freeze_BERT)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)

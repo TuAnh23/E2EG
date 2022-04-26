@@ -935,6 +935,7 @@ class XTransformerMultiTask(pecos.BaseClass):
         include_Xval_Xtest_for_training=False,
         include_additional_mclass_round=False,
         train_last_mtask_longer=False,
+        include_additional_mclass_round_HEAD=False,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1114,6 +1115,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             bootstrapping, inst_embeddings = None, None
 
             for i in range(nr_transformers + 1):
+                freeze_BERT = False
                 if i == nr_transformers:
                     # This is the additional round for mclass
                     additional_mclass_round = True
@@ -1122,8 +1124,11 @@ class XTransformerMultiTask(pecos.BaseClass):
                     # Check if the last round has the best validation accuracy
                     # if not, then model already overfit, no need to run this additional round
                     _, best_round_index, _ = extract_train_performance_logs(experiment_dir)
-                    if best_round_index < nr_transformers-1 or (not include_additional_mclass_round):
+                    if best_round_index < nr_transformers-1 or \
+                            (not (include_additional_mclass_round or include_additional_mclass_round_HEAD)):
                         break
+                    if include_additional_mclass_round_HEAD:
+                        freeze_BERT = True
                     # Set incompatible variables from the mlabel task. We do not need mlabel anyway
                     M, val_M = None, None
                     M_pred, val_M_pred = None, None
@@ -1278,6 +1283,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     additional_mclass_round=additional_mclass_round,
                     train_last_mtask_longer=train_last_mtask_longer,
                     last_mtask=last_mtask,
+                    freeze_BERT=freeze_BERT,
                 )
                 parent_model = res_dict["matcher"]
                 M_pred = res_dict["trn_pred_label"]
