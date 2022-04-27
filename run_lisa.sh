@@ -3,9 +3,11 @@
 #SBATCH --partition=gpu_shared
 #SBATCH --gres=gpu:1
 #SBATCH -c 6
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
 #SBATCH --job-name=ExampleJob
 #SBATCH --time=00-12:00:00
-#SBATCH --mem=90000M
+#SBATCH --mem=62500M
 #SBATCH --output=slurm_output_%A.out
 
 nvidia-smi

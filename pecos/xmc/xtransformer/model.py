@@ -1138,8 +1138,8 @@ class XTransformerMultiTask(pecos.BaseClass):
                     if include_additional_mclass_round_HEAD:
                         freeze_BERT = True
                         # In this setting, BERT is freezed, so it train faster
-                        # We can set a high patient
-                        patient = 5
+                        # We can set a higher patient
+                        patient = 3
                     else:
                         patient = 1
 

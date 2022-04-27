@@ -9,6 +9,7 @@
 #  OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 #  and limitations under the License.
 import argparse
+import gc
 import glob
 import json
 import logging
@@ -850,6 +851,7 @@ def do_train(args):
                 axis=0)
             Y_trn_mlabel = vstack([Y_trn_mlabel, Y_val_mlabel, Y_test_mlabel])
             X_trn = vstack([X_trn, X_val, X_test])
+
             LOGGER.info("Transductive: include features and topology of nodes in validation set and test set "
                         "when training (i.e., only left out the mclass target)")
             LOGGER.info("In total {} training sequences".format(len(trn_corpus)))
@@ -858,7 +860,12 @@ def do_train(args):
                                                                                         Y_val_mclass.shape[0] +
                                                                                         Y_test_mclass.shape[0]))
             LOGGER.info("Training label matrix shape={}".format(Y_trn_mlabel.shape))
+            del test_corpus, Y_test_mclass, Y_test_mlabel, X_test
+            gc.collect()
+
             trn_prob = MLMultiTaskProblemWithText(trn_corpus, Y_class=Y_trn_mclass, Y_label=Y_trn_mlabel, X_feat=X_trn)
+            del trn_corpus, Y_trn_mclass, Y_trn_mlabel, X_trn
+            gc.collect()
         else:
             trn_prob = MLMultiTaskProblemWithText(trn_corpus, Y_class=Y_trn_mclass, Y_label=Y_trn_mlabel, X_feat=X_trn)
 
