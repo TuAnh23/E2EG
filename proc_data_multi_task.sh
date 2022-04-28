@@ -1,5 +1,6 @@
 
 dataset=$1
+subset=$2
 if [ ${dataset} != "ogbn-arxiv" ] && [ ${dataset} != "ogbn-products" ]; then
     echo "dataset=${dataset} is not yet supported!"
     exit
@@ -15,5 +16,6 @@ python -u proc_data_multi_task.py \
     --data-root-dir ${data_root_dir} \
     --multi-task-data-dir ${multi_task_data_dir} \
     --dataset ${dataset} \
+    --subset ${subset} \
     --max-deg ${max_degree}
 

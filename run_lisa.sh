@@ -22,14 +22,15 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=multi_task_transductive_weightLoss2_3L_addFreezeBERT
+experiment_name=mtask_products_subset
 # Download data
 cd data/proc_data_multi_task
-dataset=ogbn-arxiv
+dataset=ogbn-products
+subset="_subset"  # Whether to take a subset of the data. If yes: "_subset". If no: "".
 bash download_data.sh ${dataset}
 cd ../../
 # Process data
-bash proc_data_multi_task.sh ${dataset}
+bash proc_data_multi_task.sh ${dataset} ${subset}
 # Move files to scratch node
 echo "Moving data to scratch..."
 tmp_dir="$TMPDIR"/tuanh_scratch
@@ -53,7 +54,7 @@ if [ -d "models/cache" ]
 then
   cp -r models/cache ${tmp_dir}/models
 fi
-data_dir=${tmp_dir}/data/proc_data_multi_task/${dataset}
+data_dir=${tmp_dir}/data/proc_data_multi_task/${dataset}${subset}
 model_dir=${tmp_dir}/models/${experiment_name}
 experiment_dir=${tmp_dir}/experiments/${experiment_name}
 cache_dir=${tmp_dir}/models/cache
@@ -63,4 +64,4 @@ trap 'cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments; cp -r ${mod
 # Run train-val-test pipeline
 params_path=data/proc_data_multi_task/params_mtask_${dataset}.json
 bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
-#bash hyperparams_sweep.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} sweep_configs/${experiment_name}
+#bash hyperparams_sweep.sh ${data_dir}${subset} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} sweep_configs/${experiment_name}

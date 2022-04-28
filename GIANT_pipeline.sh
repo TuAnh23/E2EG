@@ -76,6 +76,7 @@ do
       --seed ${seed} \
       --wandb-username tuanh \
       --wandb-run-id ${timestamp} \
+      --include-Xval-Xtest-for-training "true" \
       |& tee ${experiment_dir}/run${seed}/train.log
   #==================== embed text using GIANT ===================
   python -m pecos.xmc.xtransformer.encode \
@@ -89,6 +90,7 @@ do
   python -u baseline_models/mlp.py \
       --runs 1 \
       --data_root_dir ${data_dir}/../ \
+      --data_dir ${data_dir} \
       --node_emb_path ${model_dir}/run${seed}/X.all.xrt-emb.npy \
       |& tee ${experiment_dir}/run${seed}/final_scores.txt
 done

@@ -78,7 +78,7 @@ def test(model, x, y_true, split_idx, evaluator):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='OGBN-Arxiv (MLP)')
+    parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--log_steps', type=int, default=1)
     parser.add_argument('--use_node_embedding', action='store_true')
@@ -89,34 +89,55 @@ def main():
     parser.add_argument('--epochs', type=int, default=500)
     parser.add_argument('--runs', type=int, default=10)
     parser.add_argument('--data_root_dir', type=str, default='../../dataset')
+    parser.add_argument('--data_dir', type=str)
     parser.add_argument('--node_emb_path', type=str, default=None)
     args = parser.parse_args()
     print(args)
 
+    dataset_name = args.data_dir.split('/')[-1]
+    if dataset_name.endswith("_subset"):
+        subset = True
+        dataset_name = dataset_name.split("_")[0]
+    else:
+        subset = False
+
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
-    dataset = PygNodePropPredDataset(name='ogbn-arxiv',root=args.data_root_dir)
-    split_idx = dataset.get_idx_split()
-    data = dataset[0]
+    if subset:
+        x = torch.from_numpy(smat_util.load_matrix(args.node_emb_path).astype(np.float32))
+        x = x.to(device)
+        print("Loaded pre-trained node embeddings of shape={} from {}".format(x.shape, args.node_emb_path))
+        y_true = np.load(args.data_dir + "/Y_main.all.npy")
+        split_idx = {}
+        split_idx['train'] = torch.load(args.data_dir + "/train_idx.pt")
+        split_idx['valid'] = torch.load(args.data_dir + "/valid_idx.pt")
+        split_idx['test'] = torch.load(args.data_dir + "/test_idx.pt")
+        train_idx = split_idx['train'].to(device)
 
-    if args.node_emb_path:
-        data.x = torch.from_numpy(smat_util.load_matrix(args.node_emb_path).astype(np.float32))
-        print("Loaded pre-trained node embeddings of shape={} from {}".format(data.x.shape, args.node_emb_path))
+    else:
+        dataset = PygNodePropPredDataset(name=dataset_name,root=args.data_root_dir)
+        split_idx = dataset.get_idx_split()
+        data = dataset[0]
 
-    x = data.x
-    if args.use_node_embedding:
-        embedding = torch.load('embedding.pt', map_location='cpu')
-        x = torch.cat([x, embedding], dim=-1)
-    x = x.to(device)
+        if args.node_emb_path:
+            data.x = torch.from_numpy(smat_util.load_matrix(args.node_emb_path).astype(np.float32))
+            print("Loaded pre-trained node embeddings of shape={} from {}".format(data.x.shape, args.node_emb_path))
 
-    y_true = data.y.to(device)
-    train_idx = split_idx['train'].to(device)
+        x = data.x
+        if args.use_node_embedding:
+            embedding = torch.load('embedding.pt', map_location='cpu')
+            x = torch.cat([x, embedding], dim=-1)
+        x = x.to(device)
+
+        y_true = data.y.to(device)
+        train_idx = split_idx['train'].to(device)
+
 
     model = MLP(x.size(-1), args.hidden_channels, dataset.num_classes,
                 args.num_layers, args.dropout).to(device)
 
-    evaluator = Evaluator(name='ogbn-arxiv')
+    evaluator = Evaluator(name=dataset_name)
     logger = Logger(args.runs, args)
 
     for run in range(args.runs):
