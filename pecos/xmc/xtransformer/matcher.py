@@ -1427,7 +1427,7 @@ class TransformerMatcher(pecos.BaseClass):
         # train the matcher
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:
             LOGGER.info("Start fine-tuning transformer matcher...")
-            matcher.fine_tune_encoder(prob, val_prob=val_prob, val_csr_codes=val_csr_codes)
+            matcher.fine_tune_encoder(prob, val_prob=None, val_csr_codes=val_csr_codes)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
@@ -2714,12 +2714,23 @@ class TransformerMultiTask(pecos.BaseClass):
                     label_embedding=(text_model_W_seq, text_model_b_seq),
                 )
                 loss_mlabel = loss_function_mlabel(outputs["logits_mlabel"], inputs["label_values"].to(self.device))
+                no_target = False
                 if include_Xval_Xtest_for_training:
                     # Exclude the samples with NaN target from loss calculation
                     not_nan_sample_idx = ~torch.isnan(inputs['class_value'])
-                    loss_mclass = loss_function_mclass(outputs["logits_mclass"][not_nan_sample_idx],
-                                                       inputs["class_value"][not_nan_sample_idx].type(torch.LongTensor).to(self.device)
-                                                       ) * mclass_weight
+                    if not_nan_sample_idx.any():
+                        no_target = False
+                        loss_mclass = loss_function_mclass(outputs["logits_mclass"][not_nan_sample_idx],
+                                                           inputs["class_value"][not_nan_sample_idx].type(
+                                                               torch.LongTensor).to(self.device)
+                                                           ) * mclass_weight
+                    else:
+                        no_target = True
+                        # Create an artificial loss of 0
+                        loss_mclass = loss_function_mclass(outputs["logits_mclass"],
+                                                           torch.full(inputs["class_value"].shape, 0).type(
+                                                               torch.LongTensor).to(self.device)
+                                                           ) * 0
                 else:
                     loss_mclass = loss_function_mclass(outputs["logits_mclass"],
                                                        inputs["class_value"].to(self.device)
@@ -2732,7 +2743,7 @@ class TransformerMultiTask(pecos.BaseClass):
                     loss_mlabel = loss_mlabel / train_params.gradient_accumulation_steps
                     loss_mclass = loss_mclass / train_params.gradient_accumulation_steps
 
-                if math.isclose(mclass_weight, 0):
+                if math.isclose(mclass_weight, 0) or no_target:
                     # Don't backpropagate the mclass loss
                     if include_mlabel:
                         loss_mlabel.backward()
