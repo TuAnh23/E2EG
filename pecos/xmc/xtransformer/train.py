@@ -16,6 +16,8 @@ import logging
 import os
 import sys
 import shutil
+
+import torch
 from scipy.sparse import vstack
 
 import numpy as np
@@ -29,6 +31,8 @@ from .model import XTransformer, XTransformerMultiTask
 from .module import MLProblemWithText, MLMultiTaskProblemWithText
 
 from .final_metrics_collection import extract_train_performance_logs
+
+import torch.distributed as dist
 
 LOGGER = logging.getLogger(__name__)
 
@@ -638,6 +642,9 @@ def parse_arguments():
         help="Whether running the script from a wandb sweep",
     )
 
+    parser.add_argument("--local_rank", type=int, default=0)
+    parser.add_argument("--local_world_size", type=int, default=1)
+
     return parser
 
 
@@ -647,6 +654,26 @@ def do_train(args):
     Args:
         args (argparse.Namespace): Command line arguments parsed by `parser.parse_args()`
     """
+
+    if torch.cuda.device_count() > 1:
+        # Use multi GPUs
+        # Piece of code borrowed from https://github.com/pytorch/examples/blob/main/distributed/ddp/example.py
+        env_dict = {
+            key: os.environ[key]
+            for key in ("MASTER_ADDR", "MASTER_PORT", "RANK", "WORLD_SIZE")
+        }
+        print(f"[{os.getpid()}] Initializing process group with: {env_dict}")
+        dist.init_process_group(backend="nccl")
+        print(
+            f"[{os.getpid()}]: world_size = {dist.get_world_size()}, "
+            + f"rank = {dist.get_rank()}, backend={dist.get_backend()}"
+        )
+
+        TransformerMatcher.LOCAL_RANK = args.local_rank
+        TransformerMatcher.LOCAL_WORLD_SIZE = args.local_world_size
+
+        TransformerMultiTask.LOCAL_RANK = args.local_rank
+        TransformerMultiTask.LOCAL_WORLD_SIZE = args.local_world_size
 
     if args.wandb_sweep == "yes":
         # If running from a sweep, all fixed params are stored in a json file
@@ -961,6 +988,10 @@ def do_train(args):
         # Delete models and experiments output, clear the way for the next run in sweep
         delete_folder_content(args.model_dir)
         delete_folder_content(args.experiment_dir)
+
+    if torch.cuda.device_count() > 1:
+        # Tear down the process group
+        dist.destroy_process_group()
 
 
 def delete_folder_content(dir_path):

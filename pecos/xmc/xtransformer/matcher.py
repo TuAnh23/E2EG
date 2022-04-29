@@ -35,6 +35,7 @@ from .network import ENCODER_CLASSES, HingeLoss, TransformerLinearXMCHead
 from huggingface_hub import hf_hub_download
 
 from .final_metrics_collection import extract_train_performance_logs
+import torch.distributed as dist
 
 logging.getLogger(transformers.__name__).setLevel(logging.WARNING)
 
@@ -54,6 +55,9 @@ class TransformerMatcher(pecos.BaseClass):
         "weighted-squared-hinge": HingeLoss(margin=1.0, power=2, cost_weighted=True),
         "cross-entropy": torch.nn.BCEWithLogitsLoss(reduction="sum"),
     }
+
+    LOCAL_RANK = 0
+    LOCAL_WORLD_SIZE = 1
 
     @dc.dataclass
     class TrainParams(pecos.BaseParams):  # type: ignore
@@ -232,12 +236,18 @@ class TransformerMatcher(pecos.BaseClass):
 
         Args:
             device (torch.device): the destination device
-            n_gpu (int, optional): if > 1, text_encoder will be converted to torch.nn.DataParallel to use multi-GPU
+            n_gpu (int, optional): if > 1, text_encoder will be converted to torch.nn.parallel.DistributedDataParallel to use multi-GPU
         """
         self.text_encoder.to(device)
         # multi-gpu eval
-        if n_gpu > 1 and not isinstance(self.text_encoder, torch.nn.DataParallel):
-            self.text_encoder = torch.nn.DataParallel(self.text_encoder)
+        if n_gpu > 1 and not isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel):
+            n = torch.cuda.device_count() // self.LOCAL_WORLD_SIZE
+            device_ids = list(range(self.LOCAL_RANK * n, (self.LOCAL_RANK + 1) * n))
+            print(
+                f"[{os.getpid()}] rank = {dist.get_rank()}, "
+                + f"world_size = {dist.get_world_size()}, n = {n}, device_ids = {device_ids}"
+            )
+            self.text_encoder = torch.nn.parallel.DistributedDataParallel(self.text_encoder, device_ids)
         return self
 
     def clear_cuda(self):
@@ -1554,6 +1564,9 @@ class TransformerMultiTask(pecos.BaseClass):
         "cross-entropy": torch.nn.CrossEntropyLoss()
     }
 
+    LOCAL_RANK = 0
+    LOCAL_WORLD_SIZE = 1
+
     @dc.dataclass
     class TrainParams(pecos.BaseParams):  # type: ignore
         """Training Parameters of MLModel
@@ -1732,12 +1745,18 @@ class TransformerMultiTask(pecos.BaseClass):
 
         Args:
             device (torch.device): the destination device
-            n_gpu (int, optional): if > 1, text_encoder will be converted to torch.nn.DataParallel to use multi-GPU
+            n_gpu (int, optional): if > 1, text_encoder will be converted to torch.nn.parallel.DistributedDataParallel to use multi-GPU
         """
         self.text_encoder.to(device)
         # multi-gpu eval
-        if n_gpu > 1 and not isinstance(self.text_encoder, torch.nn.DataParallel):
-            self.text_encoder = torch.nn.DataParallel(self.text_encoder)
+        if n_gpu > 1 and not isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel):
+            n = torch.cuda.device_count() // self.LOCAL_WORLD_SIZE
+            device_ids = list(range(self.LOCAL_RANK * n, (self.LOCAL_RANK + 1) * n))
+            print(
+                f"[{os.getpid()}] rank = {dist.get_rank()}, "
+                + f"world_size = {dist.get_world_size()}, n = {n}, device_ids = {device_ids}"
+            )
+            self.text_encoder = torch.nn.parallel.DistributedDataParallel(self.text_encoder, device_ids)
         return self
 
     def clear_cuda(self):
@@ -3083,8 +3102,8 @@ class TransformerMultiTask(pecos.BaseClass):
         # move matcher to desired hardware
         device, n_gpu = torch_util.setup_device(train_params.use_gpu)
         matcher.to_device(device, n_gpu)
-        train_params.batch_size *= max(1, n_gpu)
-        train_params.learning_rate *= max(1, n_gpu)  # Increase learning rate along with batch size
+        # train_params.batch_size *= max(1, n_gpu)
+        # train_params.learning_rate *= max(1, n_gpu)  # Increase learning rate along with batch size
 
         # train the matcher
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:

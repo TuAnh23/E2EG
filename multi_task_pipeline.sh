@@ -59,7 +59,7 @@ do
   #==================== train ===================
   # Store the timestamp of the start of this run to use as runID for wandb
   timestamp=$(date +%s)
-  python -m pecos.xmc.xtransformer.train \
+  python -m torch.distributed.launch --nnode=1 --node_rank=0 --nproc_per_node=1 -m pecos.xmc.xtransformer.train \
       --trn-text-path ${X_trn_txt_path} \
       --trn-feat-path ${X_trn_npz_path} \
       --trn-label-path ${Y_trn_neighbor_path} \
@@ -81,13 +81,12 @@ do
       --wandb-username tuanh \
       --wandb-run-id ${timestamp} \
       --weight-loss-strategy "include_mclass_loss_later_at_round_2" \
-      --numb-layers-mclass-pred 3 \
+      --numb-layers-mclass-pred 1 \
       --mclass-pred-dropout-prob 0.2 \
       --mclass-pred-batchnorm "yes" \
       --mclass-pred-hidden-size 256 \
       --freeze-mclass-head-range "None" \
       --include-Xval-Xtest-for-training "true" \
-      --include-additional-mclass-round-HEAD "true" \
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================
