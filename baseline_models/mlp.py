@@ -109,12 +109,15 @@ def main():
         x = x.to(device)
         print("Loaded pre-trained node embeddings of shape={} from {}".format(x.shape, args.node_emb_path))
         y_true = np.load(args.data_dir + "/Y_main.all.npy")
+        y_true = torch.tensor(np.expand_dims(y_true, axis=1)).to(device)
         split_idx = {}
         split_idx['train'] = torch.load(args.data_dir + "/train_idx.pt")
         split_idx['valid'] = torch.load(args.data_dir + "/valid_idx.pt")
         split_idx['test'] = torch.load(args.data_dir + "/test_idx.pt")
         train_idx = split_idx['train'].to(device)
 
+        y_trn = np.load(args.data_dir + "/Y_main.trn.npy")
+        nr_classes = np.max(y_trn) + 1
     else:
         dataset = PygNodePropPredDataset(name=dataset_name,root=args.data_root_dir)
         split_idx = dataset.get_idx_split()
@@ -133,8 +136,10 @@ def main():
         y_true = data.y.to(device)
         train_idx = split_idx['train'].to(device)
 
+        nr_classes = dataset.num_classes
 
-    model = MLP(x.size(-1), args.hidden_channels, dataset.num_classes,
+
+    model = MLP(x.size(-1), args.hidden_channels, nr_classes,
                 args.num_layers, args.dropout).to(device)
 
     evaluator = Evaluator(name=dataset_name)

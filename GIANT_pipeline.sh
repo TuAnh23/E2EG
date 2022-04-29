@@ -65,9 +65,9 @@ do
       --trn-text-path ${X_trn_txt_path} \
       --trn-feat-path ${X_trn_npz_path} \
       --trn-label-path ${Y_trn_neighbor_path} \
-      --tst-text-path ${X_val_txt_path} \
-      --tst-feat-path ${X_val_npz_path} \
-      --tst-label-path ${Y_val_neighbor_path} \
+      --val-text-path ${X_val_txt_path} \
+      --val-feat-path ${X_val_npz_path} \
+      --val-label-path ${Y_val_neighbor_path} \
       --model-dir ${model_dir}/run${seed} \
       --experiment-dir ${experiment_dir}/run${seed} \
       --cache-dir ${cache_dir} \

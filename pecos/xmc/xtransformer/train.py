@@ -875,7 +875,26 @@ def do_train(args):
             val_prob = None
     else:
         # XMC problem
-        trn_prob = MLProblemWithText(trn_corpus, Y_trn_mlabel, X_feat=X_trn)
+        if args.include_Xval_Xtest_for_training:
+            # Include val and test to the training data
+            trn_corpus = trn_corpus + val_corpus + test_corpus
+            Y_trn_mlabel = vstack([Y_trn_mlabel, Y_val_mlabel, Y_test_mlabel])
+            X_trn = vstack([X_trn, X_val, X_test])
+
+            LOGGER.info("Transductive: include features and topology of nodes in validation set and test set "
+                        "when training")
+            LOGGER.info("In total {} training sequences".format(len(trn_corpus)))
+            LOGGER.info("Training feature matrix shape={}".format(X_trn.shape))
+            LOGGER.info("Training label matrix shape={}".format(Y_trn_mlabel.shape))
+            del test_corpus, Y_test_mlabel, X_test
+            gc.collect()
+
+            trn_prob = MLProblemWithText(trn_corpus, Y_trn_mlabel, X_feat=X_trn)
+            del trn_corpus, Y_trn_mlabel, X_trn
+            gc.collect()
+        else:
+            trn_prob = MLProblemWithText(trn_corpus, Y_trn_mlabel, X_feat=X_trn)
+
         if all(v is not None for v in [val_corpus, Y_val_mlabel]):
             val_prob = MLProblemWithText(val_corpus, Y_val_mlabel, X_feat=X_val)
         else:

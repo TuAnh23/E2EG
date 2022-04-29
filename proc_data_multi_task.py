@@ -40,7 +40,9 @@ def main():
     edge_index = data.edge_index
 
     if args.subset:
-        node_subset, edge_index, _, _ = k_hop_subgraph(node_idx=5, num_hops=3, edge_index=data.edge_index)
+        node_subset, edge_index, _, _ = k_hop_subgraph(node_idx=torch.tensor(range(0, 2000, 100)),
+                                                       num_hops=2,
+                                                       edge_index=data.edge_index)
         # Re-index the nodes to be in [0, nr_nodes-1]
         map_old_new_idx = dict(zip(node_subset.tolist(), range(0, len(node_subset))))
         edge_index = edge_index.apply_(lambda x: map_old_new_idx[x])
