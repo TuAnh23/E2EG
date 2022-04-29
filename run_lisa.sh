@@ -9,6 +9,7 @@
 #SBATCH --time=00-12:00:00
 #SBATCH --mem=62500M
 #SBATCH --output=slurm_output_%A.out
+#SBATCH --overcommit
 
 nvidia-smi
 
@@ -22,11 +23,11 @@ source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=mtask_products_subset
+experiment_name=
 # Download data
 cd data/proc_data_multi_task
-dataset=ogbn-products
-subset="_subset"  # Whether to take a subset of the data. If yes: "_subset". If no: "".
+dataset=ogbn-arxiv
+subset=""  # Whether to take a subset of the data. If yes: "_subset". If no: "".
 bash download_data.sh ${dataset}
 cd ../../
 # Process data

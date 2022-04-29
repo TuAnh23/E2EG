@@ -16,6 +16,6 @@ python -u proc_data_multi_task.py \
     --data-root-dir ${data_root_dir} \
     --multi-task-data-dir ${multi_task_data_dir} \
     --dataset ${dataset} \
-    --subset ${subset} \
+    --subset "${subset}" \
     --max-deg ${max_degree}
 

@@ -68,6 +68,9 @@ do
       --val-text-path ${X_val_txt_path} \
       --val-feat-path ${X_val_npz_path} \
       --val-label-path ${Y_val_neighbor_path} \
+      --test-text-path ${X_test_txt_path} \
+      --test-feat-path ${X_test_npz_path} \
+      --test-label-path ${Y_test_neighbor_path} \
       --model-dir ${model_dir}/run${seed} \
       --experiment-dir ${experiment_dir}/run${seed} \
       --cache-dir ${cache_dir} \
