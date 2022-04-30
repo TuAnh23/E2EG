@@ -7,9 +7,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --job-name=ExampleJob
 #SBATCH --time=00-12:00:00
-#SBATCH --mem=62500M
+#SBATCH --mem=90000M
 #SBATCH --output=slurm_output_%A.out
-#SBATCH --overcommit
 
 nvidia-smi
 
@@ -17,13 +16,16 @@ module purge
 module load 2021
 module load Anaconda3/2021.05
 
+echo 1 | sudo tee /proc/sys/vm/overcommit_memory
+head /proc/sys/vm/overcommit_memory
+
 # Your job starts in the directory where you call sbatch
 # Activate your environment
 source activate giant-xrt
 which python
 # Run your code
 export WANDB_DIR=$HOME
-experiment_name=
+experiment_name=mtask_roberta
 # Download data
 cd data/proc_data_multi_task
 dataset=ogbn-arxiv

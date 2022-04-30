@@ -38,6 +38,7 @@ from transformers.modeling_utils import SequenceSummary
 
 from transformers.models.bert.modeling_bert import BERT_INPUTS_DOCSTRING, BERT_START_DOCSTRING
 from transformers.models.roberta.modeling_roberta import (
+    RobertaPreTrainedModel,
     ROBERTA_INPUTS_DOCSTRING,
     ROBERTA_START_DOCSTRING,
 )
@@ -415,7 +416,7 @@ class BertForMultiTask(BertPreTrainedModel):
     """Roberta Model with mutli-label classification head on top for XMC.\n""",
     ROBERTA_START_DOCSTRING,
 )
-class RobertaForXMC(BertPreTrainedModel):
+class RobertaForXMC(RobertaPreTrainedModel):
     """
     Examples:
         tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
@@ -478,6 +479,151 @@ class RobertaForXMC(BertPreTrainedModel):
             logits = (pooled_output.unsqueeze(1) * W_act).sum(dim=-1) + b_act.squeeze(2)
         return {
             "logits": logits,
+            "pooled_output": pooled_output,
+            "hidden_states": instance_hidden_states,
+        }
+
+@add_start_docstrings(
+    """Roberta Model with two classification heads on top: one for eXtreme Multi-label Classification (XMC) and one for 
+     the common Multi-class Classification.\n""",
+    ROBERTA_START_DOCSTRING,
+)
+class RobertaForMultiTask(RobertaPreTrainedModel):
+    """
+    Examples:
+        tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        model = RobertaForMultiTask.from_pretrained('roberta-base')
+        input_ids = torch.tensor(tokenizer.encode("iphone 11 case", add_special_tokens=True)).unsqueeze(0)
+        outputs = model(input_ids)
+        last_hidden_states = outputs["hidden_states"]
+    """
+
+    def __init__(self, config, num_classes, mclass_pred_hyperparam=None, freeze_mclass_head=False,
+                 init_scheme_mclass_head=None):
+        super(RobertaForMultiTask, self).__init__(config)
+        self.num_labels = config.num_labels  # Number of labels for multi-label XMC
+        self.num_classes = num_classes
+
+        self.roberta = RobertaModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+        # For multi-class classification
+        self.freeze_mclass_head = freeze_mclass_head
+        self.mclass_pred_hyperparam = mclass_pred_hyperparam
+        numb_layers_mclass_pred = self.mclass_pred_hyperparam['numb_layers_mclass_pred']
+        mclass_pred_dropout_prob = self.mclass_pred_hyperparam['mclass_pred_dropout_prob']
+        mclass_pred_batchnorm = self.mclass_pred_hyperparam['mclass_pred_batchnorm']
+        mclass_pred_hidden_size = self.mclass_pred_hyperparam['mclass_pred_hidden_size']
+
+        self.mclass_seq = nn.Sequential()
+
+        if numb_layers_mclass_pred < 1:
+            raise RuntimeError("Number of layers for multi-class prediction should be at least 1.")
+
+        for i in range(0, numb_layers_mclass_pred):
+            if i == numb_layers_mclass_pred-1:
+                # In the last layer, output number of values correspond to the number of classes
+                linear_output_size = self.num_classes
+            else:
+                linear_output_size = mclass_pred_hidden_size
+
+            if i == 0:
+                # In the first layer, input size is the hidden size of Roberta
+                linear_input_size = config.hidden_size
+            else:
+                linear_input_size = mclass_pred_hidden_size
+
+            if i >= 1:
+                self.mclass_seq.add_module(f"dropout{i-1}", nn.Dropout(mclass_pred_dropout_prob))
+            self.mclass_seq.add_module(f"linear{i}", nn.Linear(linear_input_size, linear_output_size))
+
+            if i != numb_layers_mclass_pred - 1:
+                # Batchnorm and relu in between layers
+                if mclass_pred_batchnorm == "yes":
+                    self.mclass_seq.add_module(f"batchnorm{i}", nn.BatchNorm1d(linear_output_size))
+                self.mclass_seq.add_module(f"relu{i}", nn.ReLU())
+
+        self.init_weights()
+
+        if init_scheme_mclass_head is not None and init_scheme_mclass_head != 'default':
+            # Replace the default N(0, 0.02) initialization
+            def manual_weight_init(m):
+                if type(m) == nn.Linear:
+                    if init_scheme_mclass_head == 'uniform':
+                        nn.init.uniform_(m.weight, a=-1.0/m.in_features, b=1.0/m.in_features)
+                        if m.bias is not None:
+                            m.bias.data.fill_(1.0/m.in_features)
+                    elif init_scheme_mclass_head == 'constant':
+                        nn.init.constant_(m.weight, val=1.0/m.in_features)
+                        if m.bias is not None:
+                            m.bias.data.fill_(1.0/m.in_features)
+
+            self.mclass_seq.apply(manual_weight_init)
+
+        for param in self.mclass_seq.parameters():
+            if self.freeze_mclass_head:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+    def init_from(self, model):
+        self.roberta = model.roberta
+        self.mclass_seq = model.mclass_seq
+        for param in self.mclass_seq.parameters():
+            if self.freeze_mclass_head:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+
+    @add_start_docstrings(ROBERTA_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        label_embedding=None,
+    ):
+        r"""
+        Returns:
+          :obj:`dict` containing:
+                {'logits_mlabel': (:obj:`torch.FloatTensor` of shape (batch_size, num_labels)) pred logits for each LABEL
+                in the prediction head for multi-label classification XMC,
+                 'logits_mclass': (:obj:`torch.FloatTensor` of shape (batch_size, num_classes)) pred logits for each CLASS
+                in the prediction head for multi-class classification,
+                 'pooled_output': (:obj:`torch.FloatTensor` of shape (batch_size, hidden_dim)) input sequence embedding vector,
+                 'hidden_states': (:obj:`torch.FloatTensor` of shape (batch_size, sequence_length, hidden_dim)) the last layer hidden states,
+                }
+        """
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            return_dict=True,
+        )
+        pooled_output = outputs.pooler_output
+        pooled_output = self.dropout(pooled_output)
+        instance_hidden_states = outputs.last_hidden_state
+
+        # For multi-class classification head
+        logits_mclass = self.mclass_seq(pooled_output)
+
+        # For multi-label classification XMC head
+        logits_mlabel = None
+        if label_embedding is not None:
+            W_act, b_act = label_embedding
+            W_act = W_act.to(pooled_output.device)
+            b_act = b_act.to(pooled_output.device)
+            logits_mlabel = (pooled_output.unsqueeze(1) * W_act).sum(dim=-1) + b_act.squeeze(2)
+        return {
+            "logits_mlabel": logits_mlabel,
+            "logits_mclass": logits_mclass,
             "pooled_output": pooled_output,
             "hidden_states": instance_hidden_states,
         }
@@ -637,15 +783,161 @@ class DistilBertForXMC(DistilBertPreTrainedModel):
         }
 
 
+@add_start_docstrings(
+    """DistilBert Model with two classification heads on top: one for eXtreme Multi-label Classification (XMC) and one for 
+     the common Multi-class Classification.\n""",
+    DISTILBERT_START_DOCSTRING,
+)
+class DistilBertForMultiTask(DistilBertPreTrainedModel):
+    """
+    Examples:
+        tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+        model = DistilBertForMultiTask.from_pretrained('distilbert-base-uncased')
+        input_ids = torch.tensor(tokenizer.encode("iphone 11 case", add_special_tokens=True)).unsqueeze(0)
+        outputs = model(input_ids)
+        last_hidden_states = outputs["hidden_states"]
+    """
+
+    def __init__(self, config, num_classes, mclass_pred_hyperparam=None, freeze_mclass_head=False,
+                 init_scheme_mclass_head=None):
+        super(DistilBertForMultiTask, self).__init__(config)
+        self.num_labels = config.num_labels  # Number of labels for multi-label XMC
+        self.num_classes = num_classes
+
+        self.distilbert = DistilBertModel(config)
+        self.dropout = nn.Dropout(config.dropout)
+
+        # For multi-class classification
+        self.freeze_mclass_head = freeze_mclass_head
+        self.mclass_pred_hyperparam = mclass_pred_hyperparam
+        numb_layers_mclass_pred = self.mclass_pred_hyperparam['numb_layers_mclass_pred']
+        mclass_pred_dropout_prob = self.mclass_pred_hyperparam['mclass_pred_dropout_prob']
+        mclass_pred_batchnorm = self.mclass_pred_hyperparam['mclass_pred_batchnorm']
+        mclass_pred_hidden_size = self.mclass_pred_hyperparam['mclass_pred_hidden_size']
+
+        self.mclass_seq = nn.Sequential()
+
+        if numb_layers_mclass_pred < 1:
+            raise RuntimeError("Number of layers for multi-class prediction should be at least 1.")
+
+        for i in range(0, numb_layers_mclass_pred):
+            if i == numb_layers_mclass_pred-1:
+                # In the last layer, output number of values correspond to the number of classes
+                linear_output_size = self.num_classes
+            else:
+                linear_output_size = mclass_pred_hidden_size
+
+            if i == 0:
+                # In the first layer, input size is the hidden size of DistilBert
+                linear_input_size = config.hidden_size
+            else:
+                linear_input_size = mclass_pred_hidden_size
+
+            if i >= 1:
+                self.mclass_seq.add_module(f"dropout{i-1}", nn.Dropout(mclass_pred_dropout_prob))
+            self.mclass_seq.add_module(f"linear{i}", nn.Linear(linear_input_size, linear_output_size))
+
+            if i != numb_layers_mclass_pred - 1:
+                # Batchnorm and relu in between layers
+                if mclass_pred_batchnorm == "yes":
+                    self.mclass_seq.add_module(f"batchnorm{i}", nn.BatchNorm1d(linear_output_size))
+                self.mclass_seq.add_module(f"relu{i}", nn.ReLU())
+
+        self.init_weights()
+
+        if init_scheme_mclass_head is not None and init_scheme_mclass_head != 'default':
+            # Replace the default N(0, 0.02) initialization
+            def manual_weight_init(m):
+                if type(m) == nn.Linear:
+                    if init_scheme_mclass_head == 'uniform':
+                        nn.init.uniform_(m.weight, a=-1.0/m.in_features, b=1.0/m.in_features)
+                        if m.bias is not None:
+                            m.bias.data.fill_(1.0/m.in_features)
+                    elif init_scheme_mclass_head == 'constant':
+                        nn.init.constant_(m.weight, val=1.0/m.in_features)
+                        if m.bias is not None:
+                            m.bias.data.fill_(1.0/m.in_features)
+
+            self.mclass_seq.apply(manual_weight_init)
+
+        for param in self.mclass_seq.parameters():
+            if self.freeze_mclass_head:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+    def init_from(self, model):
+        self.distilbert = model.distilbert
+        self.mclass_seq = model.mclass_seq
+        for param in self.mclass_seq.parameters():
+            if self.freeze_mclass_head:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+
+    @add_start_docstrings(DISTILBERT_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        label_embedding=None,
+    ):
+        r"""
+        Returns:
+          :obj:`dict` containing:
+                {'logits_mlabel': (:obj:`torch.FloatTensor` of shape (batch_size, num_labels)) pred logits for each LABEL
+                in the prediction head for multi-label classification XMC,
+                 'logits_mclass': (:obj:`torch.FloatTensor` of shape (batch_size, num_classes)) pred logits for each CLASS
+                in the prediction head for multi-class classification,
+                 'pooled_output': (:obj:`torch.FloatTensor` of shape (batch_size, hidden_dim)) input sequence embedding vector,
+                 'hidden_states': (:obj:`torch.FloatTensor` of shape (batch_size, sequence_length, hidden_dim)) the last layer hidden states,
+                }
+        """
+        outputs = self.distilbert(
+            input_ids,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            return_dict=True,
+        )
+        pooled_output = self.dropout(outputs.last_hidden_state[:, 0, :])
+        instance_hidden_states = outputs.last_hidden_state
+
+        # For multi-class classification head
+        logits_mclass = self.mclass_seq(pooled_output)
+
+        # For multi-label classification XMC head
+        logits_mlabel = None
+        if label_embedding is not None:
+            W_act, b_act = label_embedding
+            W_act = W_act.to(pooled_output.device)
+            b_act = b_act.to(pooled_output.device)
+            logits_mlabel = (pooled_output.unsqueeze(1) * W_act).sum(dim=-1) + b_act.squeeze(2)
+        return {
+            "logits_mlabel": logits_mlabel,
+            "logits_mclass": logits_mclass,
+            "pooled_output": pooled_output,
+            "hidden_states": instance_hidden_states,
+        }
+
+
 ENCODER_CLASSES = {
     "bert": TransformerModelClass(BertConfig, BertForXMC, BertTokenizerFast),
     "bert-multitask": TransformerModelClass(BertConfig, BertForMultiTask, BertTokenizerFast),
     "roberta": TransformerModelClass(RobertaConfig, RobertaForXMC, RobertaTokenizerFast),
+    "roberta-multitask": TransformerModelClass(RobertaConfig, RobertaForMultiTask, RobertaTokenizerFast),
     "xlm-roberta": TransformerModelClass(
         XLMRobertaConfig, XLMRobertaForXMC, XLMRobertaTokenizerFast
     ),
     "xlnet": TransformerModelClass(XLNetConfig, XLNetForXMC, XLNetTokenizerFast),
     "distilbert": TransformerModelClass(
         DistilBertConfig, DistilBertForXMC, DistilBertTokenizerFast
+    ),
+    "distilbert-multitask": TransformerModelClass(
+        DistilBertConfig, DistilBertForMultiTask, DistilBertTokenizerFast
     ),
 }

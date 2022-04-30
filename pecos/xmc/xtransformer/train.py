@@ -262,10 +262,8 @@ def parse_arguments():
     )
     parser.add_argument(
         "--model-shortcut",
-        type=str,
-        metavar="STR",
-        default="bert-base-cased",
-        help="pre-trained transformer model name shortcut for download (default bert-base-cased)",
+        default=None,
+        help="pre-trained transformer model name shortcut for download (default bert-base-uncased)",
     )
     parser.add_argument(
         "--init-model-dir",
@@ -725,6 +723,9 @@ def do_train(args):
             {k: v for k, v in vars(args).items() if v is not None},
             recursive=True,
         )
+
+    if args.model_shortcut is not None:
+        train_params.model_shortcut = args.model_shortcut
 
     torch_util.set_seed(args.seed)
     LOGGER.info("Setting random seed {}".format(args.seed))

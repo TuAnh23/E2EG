@@ -87,6 +87,7 @@ do
       --mclass-pred-hidden-size 256 \
       --freeze-mclass-head-range "None" \
       --include-Xval-Xtest-for-training "true" \
+      --model-shortcut "roberta-base" \
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================
