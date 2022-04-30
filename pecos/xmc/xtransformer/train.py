@@ -677,6 +677,7 @@ def do_train(args):
               "train_last_mtask_longer": args.train_last_mtask_longer,
               "include_additional_mclass_round": args.include_additional_mclass_round,
               "include_additional_mclass_round_HEAD": args.include_additional_mclass_round_HEAD,
+              "model_shortcut": args.model_shortcut,
               }
 
     LOGGER.info(f"Manual configuration: {config}")
@@ -725,7 +726,7 @@ def do_train(args):
         )
 
     if args.model_shortcut is not None:
-        train_params.model_shortcut = args.model_shortcut
+        train_params.matcher_params_chain.model_shortcut = args.model_shortcut
 
     torch_util.set_seed(args.seed)
     LOGGER.info("Setting random seed {}".format(args.seed))

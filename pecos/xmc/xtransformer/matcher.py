@@ -444,11 +444,11 @@ class TransformerMatcher(pecos.BaseClass):
                             force_filename="pytorch_model.bin")
             hf_hub_download(repo_id=model_shortcut, filename="tokenizer.json", cache_dir=save_path,
                             force_filename="tokenizer.json")
-            hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path,
-                            force_filename="tokenizer_config.json")
-            hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path,
-                            force_filename="vocab.txt")
-
+            if model_shortcut != "roberta-base":
+                hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path,
+                                force_filename="tokenizer_config.json")
+                hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path,
+                                force_filename="vocab.txt")
         LOGGER.info("Load model from {}.".format(save_path))
 
         # AutoConfig will infer transformer type from shortcut
@@ -1986,8 +1986,9 @@ class TransformerMultiTask(pecos.BaseClass):
             hf_hub_download(repo_id=model_shortcut, filename="config.json", cache_dir=save_path, force_filename="config.json")
             hf_hub_download(repo_id=model_shortcut, filename="pytorch_model.bin", cache_dir=save_path, force_filename="pytorch_model.bin")
             hf_hub_download(repo_id=model_shortcut, filename="tokenizer.json", cache_dir=save_path, force_filename="tokenizer.json")
-            hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path, force_filename="tokenizer_config.json")
-            hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path, force_filename="vocab.txt")
+            if model_shortcut != "roberta-base":
+                hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path, force_filename="tokenizer_config.json")
+                hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path, force_filename="vocab.txt")
 
         LOGGER.info("Load model from {}.".format(save_path))
 
