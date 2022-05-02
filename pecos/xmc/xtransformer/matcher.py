@@ -1788,6 +1788,24 @@ class TransformerMultiTask(pecos.BaseClass):
             return self.text_encoder.device
 
     @property
+    def transformer_component(self):
+        """Get the transformer part (e.g., BERT) of the text_encoder"""
+        if hasattr(self.text_encoder, "module"):
+            if type(self.text_encoder.module).__name__ == "BertForMultiTask":
+                return self.text_encoder.module.bert
+            elif type(self.text_encoder.module).__name__ == "RobertaForMultiTask":
+                return self.text_encoder.module.roberta
+            elif type(self.text_encoder.module).__name__ == "DistilBertForMultiTask":
+                return self.text_encoder.module.distilbert
+        else:
+            if type(self.text_encoder).__name__ == "BertForMultiTask":
+                return self.text_encoder.bert
+            elif type(self.text_encoder).__name__ == "RobertaForMultiTask":
+                return self.text_encoder.roberta
+            elif type(self.text_encoder).__name__ == "DistilBertForMultiTask":
+                return self.text_encoder.distilbert
+
+    @property
     def nr_codes(self):
         """Get the number of codes"""
         return self.C.shape[1]
@@ -3078,7 +3096,7 @@ class TransformerMultiTask(pecos.BaseClass):
                 raise ValueError(f"Unknown bootstrap_method: {train_params.bootstrap_method}")
 
         if freeze_BERT:
-            for bert_param in matcher.text_encoder.bert.parameters():
+            for bert_param in matcher.transformer_component.parameters():
                 bert_param.requires_grad = False
 
         # move matcher to desired hardware
