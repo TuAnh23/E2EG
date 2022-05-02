@@ -33,6 +33,8 @@ X_test_txt_path=${data_dir}/X.test.txt                      # test text
 X_test_npz_path=${data_dir}/X.test.tfidf.npz                # test tfidf feature
 X_test_pt_path=${data_dir}/X.test.pt                        # save test tensors here
 
+tree_path=${data_dir}/HierarchialLabelTree                  # save Hierarchial Label Tree here
+
 mkdir -p ${cache_dir}
 
 start_seed=0
@@ -77,6 +79,7 @@ do
       --cache-dir ${cache_dir} \
       --params-path ${params_path} \
       --verbose-level 3 \
+      --tree-path ${tree_path} \
       --seed ${seed} \
       --wandb-username tuanh \
       --wandb-run-id ${timestamp} \

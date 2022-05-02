@@ -922,6 +922,7 @@ class XTransformerMultiTask(pecos.BaseClass):
         cls,
         prob,
         clustering=None,
+        tree_path=None,
         val_prob=None,
         train_params=None,
         pred_params=None,
@@ -1023,25 +1024,33 @@ class XTransformerMultiTask(pecos.BaseClass):
                     only_embeddings=True,
                 )
         else:
-            # 1. Constructing primary Hierarchial Label Tree
-            if clustering is None:
-                label_feat = kwargs.get("label_feat", None)
-                if label_feat is None:
-                    if prob.X_feat is None:
-                        raise ValueError(
-                            "Instance features are required to generate label features!"
-                        )
-                    label_feat = LabelEmbeddingFactory.pifa(prob.Y_label, prob.X_feat)
-
-                clustering = Indexer.gen(
-                    label_feat,
-                    train_params=train_params.preliminary_indexer_params,
-                )
+            if tree_path is not None and os.path.exists(tree_path):
+                clustering = ClusterChain.load(tree_path)
             else:
-                # assert cluster chain in clustering is valid
-                clustering = ClusterChain(clustering)
-                if clustering[-1].shape[0] != prob.nr_labels:
-                    raise ValueError("nr_labels mismatch!")
+                # 1. Constructing primary Hierarchial Label Tree
+                if clustering is None:
+                    LOGGER.info("Constructing primary Hierarchial Label Tree")
+                    label_feat = kwargs.get("label_feat", None)
+                    if label_feat is None:
+                        if prob.X_feat is None:
+                            raise ValueError(
+                                "Instance features are required to generate label features!"
+                            )
+                        label_feat = LabelEmbeddingFactory.pifa(prob.Y_label, prob.X_feat)
+
+                    clustering = Indexer.gen(
+                        label_feat,
+                        train_params=train_params.preliminary_indexer_params,
+                    )
+
+                    if tree_path is not None:
+                        os.makedirs(tree_path)
+                        clustering.save(tree_path)
+                else:
+                    # assert cluster chain in clustering is valid
+                    clustering = ClusterChain(clustering)
+                    if clustering[-1].shape[0] != prob.nr_labels:
+                        raise ValueError("nr_labels mismatch!")
             prelim_hierarchiy = [cc.shape[0] for cc in clustering]
             LOGGER.info("Hierarchical label tree: {}".format(prelim_hierarchiy))
 
@@ -1149,12 +1158,6 @@ class XTransformerMultiTask(pecos.BaseClass):
                 else:
                     additional_mclass_round = False
                     level_i = i
-
-                if i == nr_transformers - 1:
-                    # This is the last multi-task round
-                    last_mtask = True
-                else:
-                    last_mtask = False
 
                 cur_train_params = train_params.matcher_params_chain[level_i]
                 cur_pred_params = pred_params.matcher_params_chain[level_i]

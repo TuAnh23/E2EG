@@ -204,6 +204,13 @@ def parse_arguments():
         help="path to the clustering file (CSR matrix, nr_insts * nr_labels). Will be used for both prelimiary and refined HLT if provided",
     )
     parser.add_argument(
+        "--tree-path",
+        type=str,
+        default="",
+        metavar="PATH",
+        help="path to the clustering tree in multi-task model (since this tree will not be refined)",
+    )
+    parser.add_argument(
         "--label-feat-path",
         type=str,
         default="",
@@ -929,6 +936,7 @@ def do_train(args):
             include_additional_mclass_round=args.include_additional_mclass_round,
             include_additional_mclass_round_HEAD=args.include_additional_mclass_round_HEAD,
             train_last_mtask_longer=args.train_last_mtask_longer,
+            tree_path=args.tree_path,
         )
     else:
         # XMC problem
