@@ -3084,8 +3084,8 @@ class TransformerMultiTask(pecos.BaseClass):
         # move matcher to desired hardware
         device, n_gpu = torch_util.setup_device(train_params.use_gpu)
         matcher.to_device(device, n_gpu)
-        train_params.batch_size *= max(1, n_gpu)
-        train_params.learning_rate *= max(1, n_gpu)  # Increase learning rate along with batch size
+        # train_params.batch_size *= max(1, n_gpu)
+        # train_params.learning_rate *= max(1, n_gpu)  # Increase learning rate along with batch size
 
         # train the matcher
         if train_params.max_steps > 0 or train_params.num_train_epochs > 0:
