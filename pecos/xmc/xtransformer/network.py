@@ -381,6 +381,12 @@ class BertForMultiTask(BertPreTrainedModel):
                  'hidden_states': (:obj:`torch.FloatTensor` of shape (batch_size, sequence_length, hidden_dim)) the last layer hidden states,
                 }
         """
+        if input_ids.shape[0] == 1:
+            # Do not train batchnorm layer when batch size is 1
+            for m in self.mclass_seq:
+                if "BatchNorm" in m.__class__.__name__:
+                    m.eval()
+
         outputs = self.bert(
             input_ids,
             attention_mask=attention_mask,
@@ -598,6 +604,12 @@ class RobertaForMultiTask(RobertaPreTrainedModel):
                  'hidden_states': (:obj:`torch.FloatTensor` of shape (batch_size, sequence_length, hidden_dim)) the last layer hidden states,
                 }
         """
+        if input_ids.shape[0] == 1:
+            # Do not train batchnorm layer when batch size is 1
+            for m in self.mclass_seq:
+                if "BatchNorm" in m.__class__.__name__:
+                    m.eval()
+                    
         outputs = self.roberta(
             input_ids,
             attention_mask=attention_mask,
@@ -897,6 +909,12 @@ class DistilBertForMultiTask(DistilBertPreTrainedModel):
                  'hidden_states': (:obj:`torch.FloatTensor` of shape (batch_size, sequence_length, hidden_dim)) the last layer hidden states,
                 }
         """
+        if input_ids.shape[0] == 1:
+            # Do not train batchnorm layer when batch size is 1
+            for m in self.mclass_seq:
+                if "BatchNorm" in m.__class__.__name__:
+                    m.eval()
+
         outputs = self.distilbert(
             input_ids,
             attention_mask=attention_mask,
