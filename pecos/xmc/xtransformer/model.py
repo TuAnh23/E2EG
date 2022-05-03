@@ -938,6 +938,7 @@ class XTransformerMultiTask(pecos.BaseClass):
         include_additional_mclass_round=False,
         train_last_mtask_longer=False,
         include_additional_mclass_round_HEAD=False,
+        memmap=False,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -970,6 +971,12 @@ class XTransformerMultiTask(pecos.BaseClass):
         saved_val_pt = kwargs.get("saved_val_pt", "")
         if not saved_val_pt:
             saved_val_pt = f"{temp_dir.name}/X_val.pt"
+
+        saved_trn_dir = None
+        saved_val_dir = None
+        if memmap:
+            saved_trn_dir = f"{temp_dir.name}/X_trn"
+            saved_val_dir = f"{temp_dir.name}/X_val"
 
         # construct train_params
         if train_params is None:
@@ -1306,6 +1313,9 @@ class XTransformerMultiTask(pecos.BaseClass):
                     additional_mclass_round=additional_mclass_round,
                     freeze_BERT=freeze_BERT,
                     include_mlabel=include_mlabel,
+                    memmap=memmap,
+                    saved_trn_dir=saved_trn_dir,
+                    saved_val_dir=saved_val_dir,
                 )
                 parent_model = res_dict["matcher"]
                 if i < nr_transformers - 1:

@@ -10,10 +10,12 @@
 #  and limitations under the License.
 import copy
 import gc
+import glob
 import json
 import logging
 import math
 import os
+import shutil
 import tempfile
 import time
 
@@ -28,7 +30,7 @@ from pecos.utils import smat_util, torch_util
 from pecos.xmc import MLModel, MLProblem, PostProcessor
 from sklearn.preprocessing import normalize as sk_normalize
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from transformers import AdamW, AutoConfig, get_scheduler
+from transformers import AdamW, AutoConfig, get_scheduler, BatchEncoding
 
 from .module import XMCDataset, MultiTaskDataset
 from .network import ENCODER_CLASSES, HingeLoss, TransformerLinearXMCHead
@@ -2041,7 +2043,7 @@ class TransformerMultiTask(pecos.BaseClass):
         text_model = TransformerLinearXMCHead(config.hidden_size, num_labels)
         return cls(text_encoder, text_tokenizer, text_model)
 
-    def text_to_tensor(self, corpus, max_length=None, **kwargs):
+    def text_to_tensor(self, corpus, max_length=None, saved_dir=None, memmap=False, **kwargs):
         """Convert input text corpus into padded tensors
 
         Args:
@@ -2056,6 +2058,9 @@ class TransformerMultiTask(pecos.BaseClass):
                                     "token_type_ids": tensor of token type ids,
                                     }
         """
+        if memmap:
+            assert saved_dir is not None
+
         convert_kwargs = {
             "add_special_tokens": True,
             "padding": "max_length",
@@ -2068,15 +2073,29 @@ class TransformerMultiTask(pecos.BaseClass):
         # this it to disable the warning message for tokenizer
         # REF: https://github.com/huggingface/transformers/issues/5486
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
-        LOGGER.info("***** Encoding data len={} truncation={}*****".format(len(corpus), max_length))
-        t_start = time.time()
-        feature_tensors = self.text_tokenizer.batch_encode_plus(
-            batch_text_or_text_pairs=corpus,
-            **convert_kwargs,
-        )
+        if not memmap:
+            LOGGER.info("***** Encoding data len={} truncation={}*****".format(len(corpus), max_length))
+            t_start = time.time()
+            feature_tensors = self.text_tokenizer.batch_encode_plus(
+                batch_text_or_text_pairs=corpus,
+                **convert_kwargs,
+            )
 
-        LOGGER.info("***** Finished with time cost={} *****".format(time.time() - t_start))
-        return feature_tensors
+            LOGGER.info("***** Finished with time cost={} *****".format(time.time() - t_start))
+            return feature_tensors
+        else:
+            LOGGER.info("***** Encoding data len={} truncation={} and save to {}*****".format(len(corpus), max_length,
+                                                                                              saved_dir))
+            os.mkdir(saved_dir)
+            t_start = time.time()
+            for i in range(len(corpus)):
+                feature_tensor = self.text_tokenizer.encode_plus(
+                    text=corpus[i],
+                    **convert_kwargs,
+                )
+                torch.save(feature_tensor, f"{saved_dir}/{i}.pt")
+            LOGGER.info("***** Finished with time cost={} *****".format(time.time() - t_start))
+
 
     @staticmethod
     def _get_label_tensors(M, Y, idx_padding=-1, val_padding=0, max_labels=None):
@@ -2223,6 +2242,7 @@ class TransformerMultiTask(pecos.BaseClass):
         Y_class=None,
         csr_codes=None,
         pred_params=None,
+        memmap=False,
         **kwargs,
     ):
         """Predict with the transformer matcher, allow batch prediction to reduce memory cost
@@ -2256,6 +2276,8 @@ class TransformerMultiTask(pecos.BaseClass):
             class_pred (ndarray): class prediction logits, shape = (nr_inst,)
             embeddings (ndarray): array of instance embeddings shape = (nr_inst, hidden_dim)
         """
+        if memmap:
+            assert type(X_text) == str
         if pred_params is None:
             pred_params = self.get_pred_params()
         elif isinstance(pred_params, dict):
@@ -2264,13 +2286,28 @@ class TransformerMultiTask(pecos.BaseClass):
             raise TypeError(f"Unsupported type for pred_params: {type(pred_params)}")
 
         if isinstance(X_text, list):
-            X_text = self.text_to_tensor(
-                X_text,
-                num_workers=kwargs.get("batch_gen_workers", 4),
-                max_length=pred_params.truncate_length,
-            )
+            if not memmap:
+                X_text = self.text_to_tensor(
+                    X_text,
+                    num_workers=kwargs.get("batch_gen_workers", 4),
+                    max_length=pred_params.truncate_length,
+                )
+            else:
+                saved_dir = f"{tempfile.TemporaryDirectory().name}/saved_tensor"
+                self.text_to_tensor(
+                    X_text,
+                    num_workers=kwargs.get("batch_gen_workers", 4),
+                    max_length=pred_params.truncate_length,
+                    saved_dir=saved_dir,
+                    memmap=memmap,
+                )
+                X_text = saved_dir
 
-        nr_inst = X_text["input_ids"].shape[0]
+        if not memmap:
+            nr_inst = X_text["input_ids"].shape[0]
+        else:
+            nr_inst = len(glob.glob1(X_text, "*.pt"))
+
         max_pred_chunk = kwargs.pop("max_pred_chunk", 10**7)
 
         if max_pred_chunk is None or max_pred_chunk >= nr_inst:
@@ -2280,6 +2317,7 @@ class TransformerMultiTask(pecos.BaseClass):
                 Y_class=Y_class,
                 csr_codes=csr_codes,
                 pred_params=pred_params,
+                memmap=memmap,
                 **kwargs,
             )
         else:
@@ -2288,14 +2326,32 @@ class TransformerMultiTask(pecos.BaseClass):
             P_label_chunks = []
             P_class_chunks = []
             for i in range(0, nr_inst, max_pred_chunk):
-                cur_P_label, cur_P_class, cur_embedding = self._predict(
-                    {k: v[i : i + max_pred_chunk] for k, v in X_text.items()},
-                    X_feat=None if X_feat is None else X_feat[i : i + max_pred_chunk, :],
-                    Y_class=None if Y_class is None else Y_class[i : i + max_pred_chunk],
-                    csr_codes=None if csr_codes is None else csr_codes[i : i + max_pred_chunk, :],
-                    pred_params=pred_params,
-                    **kwargs,
-                )
+                if memmap:
+                    # Move text tensors chunk to a subdir
+                    X_text_chunk = tempfile.TemporaryDirectory().name
+                    os.mkdir(X_text_chunk)
+                    for file_i, new_i in zip(range(i, min(i + max_pred_chunk, nr_inst)),
+                                             range(0, min(max_pred_chunk, nr_inst - i))):
+                        shutil.copyfile(f"{X_text}/{file_i}.pt", f"{X_text_chunk}/{new_i}.pt")
+                    cur_P_label, cur_P_class, cur_embedding = self._predict(
+                        X_text_chunk,
+                        X_feat=None if X_feat is None else X_feat[i: i + max_pred_chunk, :],
+                        Y_class=None if Y_class is None else Y_class[i: i + max_pred_chunk],
+                        csr_codes=None if csr_codes is None else csr_codes[i: i + max_pred_chunk, :],
+                        pred_params=pred_params,
+                        memmap=memmap,
+                        **kwargs,
+                    )
+                else:
+                    cur_P_label, cur_P_class, cur_embedding = self._predict(
+                        {k: v[i : i + max_pred_chunk] for k, v in X_text.items()},
+                        X_feat=None if X_feat is None else X_feat[i : i + max_pred_chunk, :],
+                        Y_class=None if Y_class is None else Y_class[i : i + max_pred_chunk],
+                        csr_codes=None if csr_codes is None else csr_codes[i : i + max_pred_chunk, :],
+                        pred_params=pred_params,
+                        memmap=memmap,
+                        **kwargs,
+                    )
                 embedding_chunks.append(cur_embedding)
                 P_label_chunks.append(cur_P_label)
                 P_class_chunks.append(cur_P_class)
@@ -2316,6 +2372,7 @@ class TransformerMultiTask(pecos.BaseClass):
         Y_class=None,
         csr_codes=None,
         pred_params=None,
+        memmap=False,
         **kwargs,
     ):
         """Predict with the transformer matcher
@@ -2368,20 +2425,33 @@ class TransformerMultiTask(pecos.BaseClass):
             )
         else:
             csr_codes_next = None
-            LOGGER.info("Predict on input text tensors({})".format(X_text["input_ids"].shape))
+            if not memmap:
+                LOGGER.info("Predict on input text tensors({})".format(X_text["input_ids"].shape))
+            else:
+                LOGGER.info("Predict on input text tensors({})".format(len(glob.glob1(X_text, "*.pt"))))
 
         label_indices_pt, label_values_pt = TransformerMultiTask._get_label_tensors(
             csr_codes_next, None, idx_padding=self.text_model.label_pad
         )
-        data = MultiTaskDataset(
-            X_text["input_ids"],
-            X_text["attention_mask"],
-            X_text["token_type_ids"],
-            torch.arange(X_text["input_ids"].shape[0]),
-            class_value=Y_class,
-            label_values=label_values_pt,
-            label_indices=label_indices_pt,
-        )
+
+        if not memmap:
+            data = MultiTaskDataset(
+                X_text["input_ids"],
+                X_text["attention_mask"],
+                X_text["token_type_ids"],
+                torch.arange(X_text["input_ids"].shape[0]),
+                class_value=Y_class,
+                label_values=label_values_pt,
+                label_indices=label_indices_pt,
+            )
+        else:
+            data = MultiTaskDataset(
+                X_text,
+                class_value=Y_class,
+                label_values=label_values_pt,
+                label_indices=label_indices_pt,
+                memmap=memmap,
+            )
 
         # since number of active labels may vary
         # using pinned memory will slow down data loading
@@ -2529,7 +2599,8 @@ class TransformerMultiTask(pecos.BaseClass):
 
     def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None,
                           finetune_round_th=None, mclass_weight=1,
-                          include_Xval_Xtest_for_training=False, include_mlabel=True):
+                          include_Xval_Xtest_for_training=False, include_mlabel=True,
+                          memmap=False):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -2584,15 +2655,25 @@ class TransformerMultiTask(pecos.BaseClass):
             idx_padding=self.text_model.label_pad,
             max_labels=train_params.max_active_matching_labels,
         )
-        train_data = MultiTaskDataset(
-            prob.X_text["input_ids"],
-            prob.X_text["attention_mask"],
-            prob.X_text["token_type_ids"],
-            torch.arange(prob.X_text["input_ids"].shape[0]),  # instance number
-            class_value=prob.Y_class,
-            label_values=label_values_pt,
-            label_indices=label_indices_pt,
-        )
+        if not memmap:
+            train_data = MultiTaskDataset(
+                prob.X_text["input_ids"],
+                prob.X_text["attention_mask"],
+                prob.X_text["token_type_ids"],
+                torch.arange(prob.X_text["input_ids"].shape[0]),  # instance number
+                class_value=prob.Y_class,
+                label_values=label_values_pt,
+                label_indices=label_indices_pt,
+                memmap=memmap,
+            )
+        else:
+            train_data = MultiTaskDataset(
+                prob.X_text,
+                class_value=prob.Y_class,
+                label_values=label_values_pt,
+                label_indices=label_indices_pt,
+                memmap=memmap,
+            )
 
         # since number of active labels may vary
         # using pinned memory will slow down data loading
@@ -2672,7 +2753,7 @@ class TransformerMultiTask(pecos.BaseClass):
 
         # Start Batch Training
         LOGGER.info("***** Running training *****")
-        LOGGER.info("  Num examples = %d", prob.X_text["input_ids"].shape[0])
+        LOGGER.info("  Num examples = %d", train_data.nr_inst)
         LOGGER.info("  Num labels = %d", self.nr_labels)
         if prob.M is not None:
             LOGGER.info("  Num active labels per instance = %d", label_indices_pt.shape[1])
@@ -2846,6 +2927,7 @@ class TransformerMultiTask(pecos.BaseClass):
                                     batch_size=train_params.batch_size,
                                     batch_gen_workers=train_params.batch_gen_workers,
                                     pred_params={"ensemble_method": "transformer-only"},
+                                    memmap=memmap,
                                 )
                                 LOGGER.info("-" * 89)
                                 LOGGER.info(
@@ -2951,6 +3033,9 @@ class TransformerMultiTask(pecos.BaseClass):
         additional_mclass_round=False,
         freeze_BERT=False,
         include_mlabel=True,
+        memmap=False,
+        saved_trn_dir=None,
+        saved_val_dir=None,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -3034,38 +3119,69 @@ class TransformerMultiTask(pecos.BaseClass):
         matcher.train_params = train_params
         matcher.pred_params = pred_params
 
-        # tokenize X_text if X_text is given as raw text
-        saved_trn_pt = kwargs.get("saved_trn_pt", "")
-        if not prob.is_tokenized:
-            if saved_trn_pt and os.path.isfile(saved_trn_pt):
-                trn_tensors = torch.load(saved_trn_pt)
-                LOGGER.info("trn tensors loaded_from {}".format(saved_trn_pt))
-            else:
-                trn_tensors = matcher.text_to_tensor(
-                    prob.X_text,
-                    num_workers=train_params.batch_gen_workers,
-                    max_length=pred_params.truncate_length,
-                )
-                if saved_trn_pt:
-                    torch.save(trn_tensors, saved_trn_pt)
-                    LOGGER.info("trn tensors saved to {}".format(saved_trn_pt))
-            prob.X_text = trn_tensors
+        if not memmap:
+            # tokenize X_text if X_text is given as raw text
+            saved_trn_pt = kwargs.get("saved_trn_pt", "")
+            if not prob.is_tokenized:
+                if saved_trn_pt and os.path.isfile(saved_trn_pt):
+                    trn_tensors = torch.load(saved_trn_pt)
+                    LOGGER.info("trn tensors loaded_from {}".format(saved_trn_pt))
+                else:
+                    trn_tensors = matcher.text_to_tensor(
+                        prob.X_text,
+                        num_workers=train_params.batch_gen_workers,
+                        max_length=pred_params.truncate_length,
+                    )
+                    if saved_trn_pt:
+                        torch.save(trn_tensors, saved_trn_pt)
+                        LOGGER.info("trn tensors saved to {}".format(saved_trn_pt))
+                prob.X_text = trn_tensors
 
-        if val_prob is not None and not val_prob.is_tokenized:
-            saved_val_pt = kwargs.get("saved_val_pt", "")
-            if saved_val_pt and os.path.isfile(saved_val_pt):
-                val_tensors = torch.load(saved_val_pt)
-                LOGGER.info("val tensors loaded from {}".format(saved_val_pt))
-            else:
-                val_tensors = matcher.text_to_tensor(
-                    val_prob.X_text,
-                    num_workers=train_params.batch_gen_workers,
-                    max_length=pred_params.truncate_length,
-                )
-                if saved_val_pt:
-                    torch.save(val_tensors, saved_val_pt)
-                    LOGGER.info("val tensors saved to {}".format(saved_val_pt))
-            val_prob.X_text = val_tensors
+            if val_prob is not None and not val_prob.is_tokenized:
+                saved_val_pt = kwargs.get("saved_val_pt", "")
+                if saved_val_pt and os.path.isfile(saved_val_pt):
+                    val_tensors = torch.load(saved_val_pt)
+                    LOGGER.info("val tensors loaded from {}".format(saved_val_pt))
+                else:
+                    val_tensors = matcher.text_to_tensor(
+                        val_prob.X_text,
+                        num_workers=train_params.batch_gen_workers,
+                        max_length=pred_params.truncate_length,
+                    )
+                    if saved_val_pt:
+                        torch.save(val_tensors, saved_val_pt)
+                        LOGGER.info("val tensors saved to {}".format(saved_val_pt))
+                val_prob.X_text = val_tensors
+        if memmap:
+            # memmap mode: save tokenized tensors to files instead of keeping in memory
+            # tokenize X_text if X_text is given as raw text
+            if not prob.is_tokenized:
+                if os.path.exists(saved_trn_dir):
+                    LOGGER.info("trn tensors available at {}".format(saved_trn_dir))
+                else:
+                    matcher.text_to_tensor(
+                        prob.X_text,
+                        num_workers=train_params.batch_gen_workers,
+                        max_length=pred_params.truncate_length,
+                        saved_dir=saved_trn_dir,
+                        memmap=memmap,
+                    )
+                    LOGGER.info("trn tensors saved to {}".format(saved_trn_dir))
+                prob.X_text = saved_trn_dir
+
+            if val_prob is not None and not val_prob.is_tokenized:
+                if os.path.exists(saved_val_dir):
+                    LOGGER.info("val tensors available at {}".format(saved_val_dir))
+                else:
+                    matcher.text_to_tensor(
+                        val_prob.X_text,
+                        num_workers=train_params.batch_gen_workers,
+                        max_length=pred_params.truncate_length,
+                        saved_dir=saved_val_dir,
+                        memmap=memmap,
+                    )
+                    LOGGER.info("val tensors saved to {}".format(saved_val_dir))
+                val_prob.X_text = saved_val_dir
 
         bootstrapping = kwargs.get("bootstrapping", None)
         if bootstrapping is not None:
@@ -3112,7 +3228,7 @@ class TransformerMultiTask(pecos.BaseClass):
             matcher.fine_tune_encoder(prob, val_prob=None, val_csr_codes=val_csr_codes,
                                       finetune_round_th=finetune_round_th, mclass_weight=mclass_weight,
                                       include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
-                                      include_mlabel=include_mlabel)
+                                      include_mlabel=include_mlabel, memmap=memmap)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
@@ -3141,6 +3257,7 @@ class TransformerMultiTask(pecos.BaseClass):
                 pred_params=pred_params,
                 batch_size=train_params.batch_size,
                 batch_gen_workers=train_params.batch_gen_workers,
+                memmap=memmap,
             )
 
         if train_concat:
@@ -3186,6 +3303,7 @@ class TransformerMultiTask(pecos.BaseClass):
                 Y_class=val_prob.Y_class,
                 batch_size=train_params.batch_size,
                 batch_gen_workers=train_params.batch_gen_workers,
+                memmap=memmap,
             )
             LOGGER.info("*************** Final Evaluation ***************")
             # compute performance on train set

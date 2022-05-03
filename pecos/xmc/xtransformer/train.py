@@ -441,6 +441,12 @@ def parse_arguments():
         help="dir to store the pre-trained models downloaded from s3",
     )
     parser.add_argument(
+        "--memmap",
+        type=str_to_bool,
+        default=False,
+        help="Whether to use memmap (i.e., lazily load text data tensor from disk) rather than having everything in RAM",
+    )
+    parser.add_argument(
         "--saved-trn-pt",
         default="",
         metavar="PATH",
@@ -937,6 +943,7 @@ def do_train(args):
             include_additional_mclass_round_HEAD=args.include_additional_mclass_round_HEAD,
             train_last_mtask_longer=args.train_last_mtask_longer,
             tree_path=args.tree_path,
+            memmap=args.memmap,
         )
     else:
         # XMC problem

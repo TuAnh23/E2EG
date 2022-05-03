@@ -80,6 +80,7 @@ do
       --params-path ${params_path} \
       --verbose-level 3 \
       --tree-path ${tree_path} \
+      --memmap "true" \
       --seed ${seed} \
       --wandb-username tuanh \
       --wandb-run-id ${timestamp} \
