@@ -8,6 +8,7 @@
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 #  OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 #  and limitations under the License.
+import gc
 import json
 import logging
 import os
@@ -1053,6 +1054,11 @@ class XTransformerMultiTask(pecos.BaseClass):
                         raise ValueError("nr_labels mismatch!")
             prelim_hierarchiy = [cc.shape[0] for cc in clustering]
             LOGGER.info("Hierarchical label tree: {}".format(prelim_hierarchiy))
+
+            # For multi-task model, we no longer need X_feat after creating the tree
+            prob.X_feat = None
+            val_prob.X_feat = None
+            gc.collect()
 
             # get the fine-tuning task numbers
             nr_transformers = sum(i <= train_params.max_match_clusters for i in prelim_hierarchiy)
