@@ -2751,6 +2751,9 @@ class TransformerMultiTask(pecos.BaseClass):
             num_training_steps=t_total,
         )
 
+        # Clear memory before our training loop
+        gc.collect()
+
         # Start Batch Training
         LOGGER.info("***** Running training *****")
         LOGGER.info("  Num examples = %d", train_data.nr_inst)
@@ -3210,6 +3213,10 @@ class TransformerMultiTask(pecos.BaseClass):
                 LOGGER.info("Randomly initialized transformer text_model!")
             else:
                 raise ValueError(f"Unknown bootstrap_method: {train_params.bootstrap_method}")
+
+            # Remove vars used for bootstrapping
+            del bootstrapping, init_encoder, init_embeddings, prev_head, bootstrap_prob
+            gc.collect()
 
         if freeze_BERT:
             for bert_param in matcher.transformer_component.parameters():

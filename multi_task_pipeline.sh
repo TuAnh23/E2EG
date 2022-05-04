@@ -19,19 +19,19 @@ Y_trn_neighbor_path=${data_dir}/Y_neighbor.trn.npz        # training label matri
 Y_trn_main_path=${data_dir}/Y_main.trn.npy                # training class matrix
 X_trn_txt_path=${data_dir}/X.trn.txt                      # training text
 X_trn_npz_path=${data_dir}/X.trn.tfidf.npz                # training tfidf feature
-X_trn_pt_path=${data_dir}/X.trn.pt                        # save trn tensors here
+X_trn_pt_path=${data_dir}/X.trn                           # save trn tensors here
 
 Y_val_neighbor_path=${data_dir}/Y_neighbor.val.npz        # validation label matrix
 Y_val_main_path=${data_dir}/Y_main.val.npy                # validation class matrix
 X_val_txt_path=${data_dir}/X.val.txt                      # validation text
 X_val_npz_path=${data_dir}/X.val.tfidf.npz                # validation tfidf feature
-X_val_pt_path=${data_dir}/X.val.pt                        # save val tensors here
+X_val_pt_path=${data_dir}/X.val                           # save val tensors here
 
 Y_test_neighbor_path=${data_dir}/Y_neighbor.test.npz        # test label matrix
 Y_test_main_path=${data_dir}/Y_main.test.npy                # test class matrix
 X_test_txt_path=${data_dir}/X.test.txt                      # test text
 X_test_npz_path=${data_dir}/X.test.tfidf.npz                # test tfidf feature
-X_test_pt_path=${data_dir}/X.test.pt                        # save test tensors here
+X_test_pt_path=${data_dir}/X.test                           # save test tensors here
 
 tree_path=${data_dir}/HierarchialLabelTree                  # save Hierarchial Label Tree here
 
@@ -81,6 +81,8 @@ do
       --verbose-level 3 \
       --tree-path ${tree_path} \
       --memmap "true" \
+      --saved-trn-pt ${X_trn_pt_path} \
+      --saved-val-pt ${X_val_pt_path} \
       --seed ${seed} \
       --wandb-username tuanh \
       --wandb-run-id ${timestamp} \
@@ -111,8 +113,9 @@ do
   do
     dir="$(basename -- ${dir_path})"
     python -m pecos.xmc.xtransformer.predict \
-      --feat-path ${X_test_npz_path} \
       --text-path ${X_test_txt_path} \
+      --saved-test-pt ${X_test_pt_path} \
+      --memmap "true" \
       --model-folder ${model_dir}/run${seed}/${dir} \
       --save-pred-path-mlabel ${experiment_dir}/run${seed}/${dir}_prediction_mlabel \
       --save-pred-path-mclass ${experiment_dir}/run${seed}/${dir}_prediction_mclass \

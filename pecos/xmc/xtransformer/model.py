@@ -939,6 +939,8 @@ class XTransformerMultiTask(pecos.BaseClass):
         train_last_mtask_longer=False,
         include_additional_mclass_round_HEAD=False,
         memmap=False,
+        saved_trn_dir=None,
+        saved_val_dir=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -972,11 +974,11 @@ class XTransformerMultiTask(pecos.BaseClass):
         if not saved_val_pt:
             saved_val_pt = f"{temp_dir.name}/X_val.pt"
 
-        saved_trn_dir = None
-        saved_val_dir = None
         if memmap:
-            saved_trn_dir = f"{temp_dir.name}/X_trn"
-            saved_val_dir = f"{temp_dir.name}/X_val"
+            if saved_trn_dir is None:
+                saved_trn_dir = f"{temp_dir.name}/X_trn"
+            if saved_val_dir is None:
+                saved_val_dir = f"{temp_dir.name}/X_val"
 
         # construct train_params
         if train_params is None:
@@ -1398,6 +1400,8 @@ class XTransformerMultiTask(pecos.BaseClass):
         X_text,
         X_feat=None,
         pred_params=None,
+        memmap=False,
+        saved_test_dir=None,
         **kwargs,
     ):
         """Use the XR-Transformer model to predict on given data.
@@ -1450,24 +1454,39 @@ class XTransformerMultiTask(pecos.BaseClass):
             encoder_pred_params = pred_params.matcher_params_chain
 
         # generate instance-to-cluster prediction
-        if saved_pt and os.path.isfile(saved_pt):
-            text_tensors = torch.load(saved_pt)
-            LOGGER.info("Text tensors loaded_from {}".format(saved_pt))
+        if not memmap:
+            if saved_pt and os.path.isfile(saved_pt):
+                X_text = torch.load(saved_pt)
+                LOGGER.info("Text tensors loaded_from {}".format(saved_pt))
+            else:
+                X_text = self.text_encoder.text_to_tensor(
+                    X_text,
+                    num_workers=batch_gen_workers,
+                    max_length=encoder_pred_params.truncate_length,
+                )
         else:
-            text_tensors = self.text_encoder.text_to_tensor(
-                X_text,
-                num_workers=batch_gen_workers,
-                max_length=encoder_pred_params.truncate_length,
-            )
+            if os.path.exists(saved_test_dir):
+                LOGGER.info("test tensors available at {}".format(saved_test_dir))
+            else:
+                self.text_encoder.text_to_tensor(
+                    X_text,
+                    num_workers=batch_gen_workers,
+                    max_length=encoder_pred_params.truncate_length,
+                    saved_dir=saved_test_dir,
+                    memmap=memmap,
+                )
+                LOGGER.info("test tensors saved to {}".format(saved_test_dir))
+            X_text = saved_test_dir
 
         self.text_encoder.to_device(device, n_gpu=n_gpu)
         pred_csr_mlabel, pred_mclass, embeddings = self.text_encoder.predict(
-            text_tensors,
+            X_text,
             pred_params=encoder_pred_params,
             batch_size=batch_size * max(1, n_gpu),
             batch_gen_workers=batch_gen_workers,
             max_pred_chunk=max_pred_chunk,
             only_embeddings=False,
+            memmap=memmap,
         )
 
         return pred_csr_mlabel, pred_mclass

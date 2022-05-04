@@ -448,16 +448,14 @@ def parse_arguments():
     )
     parser.add_argument(
         "--saved-trn-pt",
-        default="",
+        default=None,
         metavar="PATH",
-        type=str,
         help="dir to save/load tokenized train tensor",
     )
     parser.add_argument(
         "--saved-val-pt",
-        default="",
+        default=None,
         metavar="PATH",
-        type=str,
         help="dir to save/load tokenized validation tensor",
     )
     parser.add_argument(
@@ -744,14 +742,17 @@ def do_train(args):
     torch_util.set_seed(args.seed)
     LOGGER.info("Setting random seed {}".format(args.seed))
 
+    # No need to load tf-idf feature for multi-task case with HLT tree already cached
+    use_tfidf_feat = not (args.trn_class_path is not None and os.path.exists(args.tree_path))
+
     # Load training feature
-    if args.trn_feat_path:
+    if args.trn_feat_path and use_tfidf_feat:
         X_trn = smat_util.load_matrix(args.trn_feat_path, dtype=np.float32)
         LOGGER.info("Loaded training feature matrix with shape={}".format(X_trn.shape))
     else:
         X_trn = None
         LOGGER.info("Training feature matrix not provided")
-        if not args.label_feat_path and not args.code_path:
+        if not args.label_feat_path and not args.code_path and use_tfidf_feat:
             raise ValueError("trn-feat is required unless code-path or label-feat is provided.")
 
     # Load training labels
@@ -764,7 +765,7 @@ def do_train(args):
         LOGGER.info("Loaded training classes array with shape={}".format(Y_trn_mclass.shape))
 
     # Load val feature if given
-    if args.val_feat_path:
+    if args.val_feat_path and use_tfidf_feat:
         X_val = smat_util.load_matrix(args.val_feat_path, dtype=np.float32)
         LOGGER.info("Loaded val feature matrix with shape={}".format(X_val.shape))
     else:
@@ -785,7 +786,7 @@ def do_train(args):
         Y_val_mclass = None
 
     # Load test feature if given
-    if args.test_feat_path:
+    if args.test_feat_path and use_tfidf_feat:
         X_test = smat_util.load_matrix(args.test_feat_path, dtype=np.float32)
         LOGGER.info("Loaded test feature matrix with shape={}".format(X_test.shape))
     else:
@@ -865,12 +866,15 @@ def do_train(args):
                 ),
                 axis=0)
             Y_trn_mlabel = vstack([Y_trn_mlabel, Y_val_mlabel, Y_test_mlabel])
-            X_trn = vstack([X_trn, X_val, X_test])
+
+            if use_tfidf_feat:
+                X_trn = vstack([X_trn, X_val, X_test])
 
             LOGGER.info("Transductive: include features and topology of nodes in validation set and test set "
                         "when training (i.e., only left out the mclass target)")
             LOGGER.info("In total {} training sequences".format(len(trn_corpus)))
-            LOGGER.info("Training feature matrix shape={}".format(X_trn.shape))
+            if use_tfidf_feat:
+                LOGGER.info("Training feature matrix shape={}".format(X_trn.shape))
             LOGGER.info("Training classes array shape={}. In which {} are NaNs.".format(Y_trn_mclass.shape,
                                                                                         Y_val_mclass.shape[0] +
                                                                                         Y_test_mclass.shape[0]))
@@ -944,6 +948,8 @@ def do_train(args):
             train_last_mtask_longer=args.train_last_mtask_longer,
             tree_path=args.tree_path,
             memmap=args.memmap,
+            saved_trn_dir=args.saved_trn_pt,
+            saved_val_dir=args.saved_val_pt,
         )
     else:
         # XMC problem

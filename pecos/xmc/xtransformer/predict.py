@@ -22,6 +22,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 def parse_arguments():
+    def str_to_bool(value: str):
+        if value.lower() == 'yes' or value.lower() == 'true':
+            return True
+        elif value.lower() == 'no' or value.lower() == 'false':
+            return False
+        else:
+            raise ValueError
+
     """Parse predicting arguments"""
     parser = argparse.ArgumentParser()
     # Required parameters
@@ -62,6 +70,20 @@ def parse_arguments():
         type=str,
         metavar="PATH",
         help="The path where the model predictions on multi-class problem will be written.",
+    )
+
+    parser.add_argument(
+        "--saved-test-pt",
+        default=None,
+        metavar="PATH",
+        help="dir to save/load tokenized test tensor",
+    )
+
+    parser.add_argument(
+        "--memmap",
+        type=str_to_bool,
+        default=False,
+        help="Whether to use memmap (i.e., lazily load text data tensor from disk) rather than having everything in RAM",
     )
 
     parser.add_argument(
@@ -184,6 +206,8 @@ def do_predict(args):
             post_processor=args.post_processor,
             max_pred_chunk=args.max_pred_chunk,
             threads=args.threads,
+            memmap=args.memmap,
+            saved_test_dir=args.saved_test_pt,
         )
         smat_util.save_matrix(args.save_pred_path_mlabel, P_matrix_mlabel)
         smat_util.save_matrix(args.save_pred_path_mclass, P_mclass)
