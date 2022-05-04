@@ -143,9 +143,14 @@ class XMCDataset(Dataset):
             data[i] = (feature[0][i], feature[1][i], ...)
     """
 
-    def __init__(self, *features, label_values=None, label_indices=None):
-        self.nr_inst = features[0].size(0)
-        self.data = TensorDataset(*features)
+    def __init__(self, *features, label_values=None, label_indices=None, memmap=False):
+        if not memmap:
+            self.nr_inst = features[0].size(0)
+            self.data = TensorDataset(*features)
+        else:
+            self.data_path = features[0]
+            self.nr_inst = len(glob.glob1(self.data_path, "*.pt"))
+
         if label_values is not None and label_values.size(0) != self.nr_inst:
             raise ValueError("First dimension mismatch between features and label_values")
         if label_indices is not None and label_indices.size(0) != self.nr_inst:
@@ -153,16 +158,27 @@ class XMCDataset(Dataset):
 
         self.label_values = label_values
         self.label_indices = label_indices
+        self.memmap = memmap
+
+    def get_data_item_from_dir(self, i):
+        assert self.memmap
+        data_item = torch.load(f"{self.data_path}/{i}.pt")
+        return tuple([data_item["input_ids"][0], data_item["attention_mask"][0], data_item["token_type_ids"][0], torch.tensor(i)])
 
     def __getitem__(self, index):
-        if self.label_values is not None and self.label_indices is not None:
-            return self.data[index] + (self.label_values[index], self.label_indices[index])
-        elif self.label_indices is not None:
-            return self.data[index] + (self.label_indices[index],)
-        elif self.label_values is not None:
-            return self.data[index] + (self.label_values[index],)
+        if not self.memmap:
+            data_i = self.data[index]
         else:
-            return self.data[index]
+            data_i = self.get_data_item_from_dir(index)
+
+        if self.label_values is not None and self.label_indices is not None:
+            return data_i + (self.label_values[index], self.label_indices[index])
+        elif self.label_indices is not None:
+            return data_i + (self.label_indices[index],)
+        elif self.label_values is not None:
+            return data_i + (self.label_values[index],)
+        else:
+            return data_i
 
     def __len__(self):
         return self.nr_inst

@@ -21,6 +21,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 def parse_arguments():
+    def str_to_bool(value: str):
+        if value.lower() == 'yes' or value.lower() == 'true':
+            return True
+        elif value.lower() == 'no' or value.lower() == 'false':
+            return False
+        else:
+            raise ValueError
+
     """Parse encoding arguments"""
     parser = argparse.ArgumentParser()
     # Required parameters
@@ -47,6 +55,18 @@ def parse_arguments():
         required=True,
         metavar="PATH",
         help="The path where the embeddings will be written.",
+    )
+    parser.add_argument(
+        "--saved-test-pt",
+        default=None,
+        metavar="PATH",
+        help="dir to save/load tokenized test tensor",
+    )
+    parser.add_argument(
+        "--memmap",
+        type=str_to_bool,
+        default=False,
+        help="Whether to use memmap (i.e., lazily load text data tensor from disk) rather than having everything in RAM",
     )
     # ======= Other parameters ========
     parser.add_argument(
@@ -110,6 +130,8 @@ def do_encode(args):
         batch_gen_workers=args.batch_gen_workers,
         use_gpu=args.use_gpu,
         max_pred_chunk=args.max_pred_chunk,
+        memmap=args.memmap,
+        saved_test_dir=args.saved_test_pt,
     )
 
     smat_util.save_matrix(args.save_emb_path, X_emb)

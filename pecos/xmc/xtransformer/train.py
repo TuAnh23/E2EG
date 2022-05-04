@@ -964,6 +964,9 @@ def do_train(args):
             label_feat=label_feat,
             model_dir=args.model_dir,
             cache_dir_offline=args.cache_dir,
+            memmap=args.memmap,
+            saved_trn_dir=args.saved_trn_pt,
+            saved_val_dir=args.saved_val_pt,
         )
 
     xtf.save(f"{args.model_dir}/last")
