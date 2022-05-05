@@ -1120,9 +1120,11 @@ class XTransformerMultiTask(pecos.BaseClass):
             prelim_hierarchiy = [cc.shape[0] for cc in clustering]
             LOGGER.info("Hierarchical label tree: {}".format(prelim_hierarchiy))
 
-            # For multi-task model, we no longer need X_feat after creating the tree
+            # For multi-task model, we no longer need X_feat and label_feat after creating the tree
             prob.X_feat = None
             val_prob.X_feat = None
+            label_feat = None
+            del label_feat
             gc.collect()
 
             # get the fine-tuning task numbers
