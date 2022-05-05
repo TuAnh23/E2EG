@@ -2965,14 +2965,14 @@ class TransformerMultiTask(pecos.BaseClass):
                     loss_mlabel = loss_mlabel / train_params.gradient_accumulation_steps
                     loss_mclass = loss_mclass / train_params.gradient_accumulation_steps
 
-                if math.isclose(mclass_weight, 0) or no_target:
-                    # Don't backpropagate the mclass loss
-                    if include_mlabel:
-                        loss_mlabel.backward()
-                else:
-                    if include_mlabel:
-                        loss_mlabel.backward(retain_graph=True)
+                include_mclass = not (math.isclose(mclass_weight, 0) or no_target)
+                if include_mclass and include_mlabel:
+                    loss = loss_mclass + loss_mlabel
+                    loss.backward()
+                elif include_mclass:
                     loss_mclass.backward()
+                elif include_mlabel:
+                    loss_mlabel.backward()
 
                 tr_loss_mlabel += loss_mlabel.item()
                 tr_loss_mclass += loss_mclass.item()
