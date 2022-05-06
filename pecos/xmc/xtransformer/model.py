@@ -9,9 +9,12 @@
 #  OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
 #  and limitations under the License.
 import gc
+import glob
 import json
 import logging
 import os
+import shutil
+import numpy as np
 from copy import deepcopy
 import tempfile
 
@@ -1246,6 +1249,26 @@ class XTransformerMultiTask(pecos.BaseClass):
                 if level_i > 0 and not additional_mclass_round:
                     M = get_negative_samples(YC_list[level_i - 1], M_pred, cur_ns)
 
+                kept_sample = None
+                saved_trn_dir_filtered = None
+                saved_trn_pt_filtered = None
+                if (include_additional_mclass_round or include_additional_mclass_round_HEAD) \
+                        and i == nr_transformers \
+                        and include_Xval_Xtest_for_training:
+                    # Only learn the mclass task in these additional rounds.
+                    # Can remove samples without mclass target in the training data (which were used in transductive
+                    # neighborhood pred)
+                    # The filtered train data is used from this point onwards (last additional rounds)
+                    saved_trn_dir_filtered = tempfile.TemporaryDirectory().name
+                    saved_trn_pt_filtered = f"{tempfile.TemporaryDirectory().name}/X_filtered.trn"
+                    kept_sample = ~np.isnan(prob.Y_class)
+                    prob.X_text = [prob.X_text[i] for i in np.arange(len(prob.X_text))[kept_sample]]
+                    YC_list[level_i] = YC_list[level_i][kept_sample]
+                    prob.X_feat = prob.X_feat[kept_sample] if prob.X_feat is not None else None
+                    M = M[kept_sample]
+                    M_pred = M_pred[kept_sample]
+                    prob.Y_class = prob.Y_class[kept_sample]
+
                 cur_prob = MLMultiTaskProblemWithText(
                     prob.X_text,
                     YC_list[level_i],
@@ -1376,14 +1399,28 @@ class XTransformerMultiTask(pecos.BaseClass):
                     memmap=memmap,
                     saved_trn_dir=saved_trn_dir,
                     saved_val_dir=saved_val_dir,
+                    kept_sample=kept_sample,
+                    saved_trn_dir_filtered=saved_trn_dir_filtered,
+                    saved_trn_pt_filtered=saved_trn_pt_filtered,
                 )
+
+                if (include_additional_mclass_round or include_additional_mclass_round_HEAD) \
+                        and i == nr_transformers \
+                        and include_Xval_Xtest_for_training:
+                    # The filtered train data is used from this point onwards (last additional rounds)
+                    saved_trn_dir = saved_trn_dir_filtered
+                    saved_trn_pt = saved_trn_pt_filtered
+
                 parent_model = res_dict["matcher"]
                 if i < nr_transformers - 1:
-                    # No need to update these for the additional rounds
                     M_pred = res_dict["trn_pred_label"]
                     val_M_pred = res_dict["val_pred_label"]
-                inst_embeddings = res_dict["trn_embeddings"]
-                val_inst_embeddings = res_dict["val_embeddings"]
+                    inst_embeddings = res_dict["trn_embeddings"]
+                    val_inst_embeddings = res_dict["val_embeddings"]
+                else:
+                    # No need to update those values for the additional rounds
+                    inst_embeddings = None
+                    val_inst_embeddings = None
 
         if train_params.save_emb_dir:
             os.makedirs(train_params.save_emb_dir, exist_ok=True)

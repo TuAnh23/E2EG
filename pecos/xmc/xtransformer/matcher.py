@@ -3158,6 +3158,9 @@ class TransformerMultiTask(pecos.BaseClass):
         memmap=False,
         saved_trn_dir=None,
         saved_val_dir=None,
+        kept_sample=None,
+        saved_trn_dir_filtered=None,
+        saved_trn_pt_filtered=None,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -3248,15 +3251,23 @@ class TransformerMultiTask(pecos.BaseClass):
                 if saved_trn_pt and os.path.isfile(saved_trn_pt):
                     trn_tensors = torch.load(saved_trn_pt)
                     LOGGER.info("trn tensors loaded_from {}".format(saved_trn_pt))
+                    if kept_sample is not None:
+                        trn_tensors = {k: v[kept_sample] for k, v in trn_tensors.items()}
+                        os.mkdir(os.path.dirname(saved_trn_pt_filtered))
+                        torch.save(trn_tensors, saved_trn_pt_filtered)
                 else:
                     trn_tensors = matcher.text_to_tensor(
                         prob.X_text,
                         num_workers=train_params.batch_gen_workers,
                         max_length=pred_params.truncate_length,
                     )
-                    if saved_trn_pt:
+                    if saved_trn_pt and kept_sample is None:
                         torch.save(trn_tensors, saved_trn_pt)
                         LOGGER.info("trn tensors saved to {}".format(saved_trn_pt))
+                    if saved_trn_pt_filtered and kept_sample is not None:
+                        os.mkdir(os.path.dirname(saved_trn_pt_filtered))
+                        torch.save(trn_tensors, saved_trn_pt_filtered)
+                        LOGGER.info("trn tensors saved to {}".format(saved_trn_pt_filtered))
                 prob.X_text = trn_tensors
 
             if val_prob is not None and not val_prob.is_tokenized:
@@ -3280,7 +3291,17 @@ class TransformerMultiTask(pecos.BaseClass):
             if not prob.is_tokenized:
                 if os.path.exists(saved_trn_dir):
                     LOGGER.info("trn tensors available at {}".format(saved_trn_dir))
+                    # Copy kept_sample tensors to new directory
+                    if kept_sample is not None:
+                        os.mkdir(saved_trn_dir_filtered)
+                        old_idxs = np.arange(len(kept_sample))[kept_sample]
+                        for new_i, old_i in enumerate(old_idxs):
+                            shutil.copyfile(f"{saved_trn_dir}/{old_i}.pt", f"{saved_trn_dir_filtered}/{new_i}.pt")
+                        saved_trn_dir = saved_trn_dir_filtered
+
                 else:
+                    if kept_sample is not None:
+                        saved_trn_dir = saved_trn_dir_filtered
                     matcher.text_to_tensor(
                         prob.X_text,
                         num_workers=train_params.batch_gen_workers,
@@ -3334,6 +3355,7 @@ class TransformerMultiTask(pecos.BaseClass):
                 raise ValueError(f"Unknown bootstrap_method: {train_params.bootstrap_method}")
 
             # Remove vars used for bootstrapping
+            bootstrap_prob = None
             del bootstrapping, init_encoder, init_embeddings, prev_head, bootstrap_prob
             gc.collect()
 
