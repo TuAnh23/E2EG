@@ -14,19 +14,21 @@ Y_trn_neighbor_path=${data_dir}/Y_neighbor.trn.npz        # training label matri
 Y_trn_main_path=${data_dir}/Y_main.trn.npy                # training class matrix
 X_trn_txt_path=${data_dir}/X.trn.txt                      # training text
 X_trn_npz_path=${data_dir}/X.trn.tfidf.npz                # training tfidf feature
-X_trn_pt_path=${data_dir}/X.trn.pt                        # save trn tensors here
+X_trn_pt_path=${data_dir}/X.trn                           # save trn tensors here
 
 Y_val_neighbor_path=${data_dir}/Y_neighbor.val.npz        # validation label matrix
 Y_val_main_path=${data_dir}/Y_main.val.npy                # validation class matrix
 X_val_txt_path=${data_dir}/X.val.txt                      # validation text
 X_val_npz_path=${data_dir}/X.val.tfidf.npz                # validation tfidf feature
-X_val_pt_path=${data_dir}/X.val.pt                        # save val tensors here
+X_val_pt_path=${data_dir}/X.val                           # save val tensors here
 
 Y_test_neighbor_path=${data_dir}/Y_neighbor.test.npz        # test label matrix
 Y_test_main_path=${data_dir}/Y_main.test.npy                # test class matrix
 X_test_txt_path=${data_dir}/X.test.txt                      # test text
 X_test_npz_path=${data_dir}/X.test.tfidf.npz                # test tfidf feature
-X_test_pt_path=${data_dir}/X.test.pt                        # save test tensors here
+X_test_pt_path=${data_dir}/X.test                           # save test tensors here
+
+tree_path=${data_dir}/HierarchialLabelTree                  # save Hierarchial Label Tree here
 
 mkdir -p ${cache_dir}
 
@@ -62,13 +64,18 @@ python -m args_to_json \
     --params-path ${params_path} \
     --verbose-level 3 \
     --seed ${seed} \
-    --mclass-pred-batchnorm "yes" \
-    --mclass-pred-dropout-prob 0.2 \
-    --mclass-pred-hidden-size 256 \
+    --tree-path ${tree_path} \
+    --memmap "true" \
+    --saved-trn-pt ${X_trn_pt_path} \
+    --saved-val-pt ${X_val_pt_path} \
+    --weight-loss-strategy "include_mclass_loss_later_at_round_2" \
+    --include-Xval-Xtest-for-training "true" \
+    --model-shortcut "distilbert-base-uncased" \
+    --include-additional-mclass-round-HEAD "true" \
     --wandb-username tuanh \
     --wandb-sweep yes \
     --save_json_path ${sweep_config_dir}/training_config.json \
-    --swept_args "numb_layers_mclass_pred|freeze_mclass_head_range|weight_loss_strategy"
+    --swept_args "numb_layers_mclass_pred|mclass_pred_dropout_prob|mclass_pred_batchnorm|mclass_pred_hidden_size"
 
 ##==================== setup sweep ===================
 wandb sweep --entity ${username} --project ${projectname} ${sweep_config_dir}/sweep.yaml |& tee ${sweep_config_dir}/sweep_info.txt

@@ -35,6 +35,8 @@ X_test_txt_path=${data_dir}/X.test.txt                      # test text
 X_test_npz_path=${data_dir}/X.test.tfidf.npz                # test tfidf feature
 X_test_pt_path=${data_dir}/X.test                           # save test tensors here
 
+tree_path=${data_dir}/HierarchialLabelTree                  # save Hierarchial Label Tree here
+
 mkdir -p ${cache_dir}
 
 start_seed=0
@@ -77,6 +79,7 @@ do
       --params-path ${params_path} \
       --verbose-level 3 \
       --seed ${seed} \
+      --tree-path ${tree_path} \
       --memmap "true" \
       --saved-trn-pt ${X_trn_pt_path} \
       --saved-val-pt ${X_val_pt_path} \
@@ -97,7 +100,7 @@ do
   #==================== train MLP ===================
   python -u baseline_models/mlp.py \
       --runs 1 \
-      --data_root_dir ${data_dir}/../ \
+      --data_root_dir ${data_dir}/../../ \
       --data_dir ${data_dir} \
       --node_emb_path ${model_dir}/run${seed}/X.all.xrt-emb.npy \
       |& tee ${experiment_dir}/run${seed}/final_scores.txt

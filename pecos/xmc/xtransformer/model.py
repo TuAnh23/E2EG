@@ -230,6 +230,7 @@ class XTransformer(pecos.BaseClass):
         memmap=False,
         saved_trn_dir=None,
         saved_val_dir=None,
+        tree_path=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -323,25 +324,33 @@ class XTransformer(pecos.BaseClass):
                     only_embeddings=True,
                 )
         else:
-            # 1. Constructing primary Hierarchial Label Tree
-            if clustering is None:
-                label_feat = kwargs.get("label_feat", None)
-                if label_feat is None:
-                    if prob.X_feat is None:
-                        raise ValueError(
-                            "Instance features are required to generate label features!"
-                        )
-                    label_feat = LabelEmbeddingFactory.pifa(prob.Y_label, prob.X_feat)
-
-                clustering = Indexer.gen(
-                    label_feat,
-                    train_params=train_params.preliminary_indexer_params,
-                )
+            if tree_path is not None and os.path.exists(tree_path):
+                clustering = ClusterChain.load(tree_path)
             else:
-                # assert cluster chain in clustering is valid
-                clustering = ClusterChain(clustering)
-                if clustering[-1].shape[0] != prob.nr_labels:
-                    raise ValueError("nr_labels mismatch!")
+                # 1. Constructing primary Hierarchial Label Tree
+                if clustering is None:
+                    label_feat = kwargs.get("label_feat", None)
+                    if label_feat is None:
+                        if prob.X_feat is None:
+                            raise ValueError(
+                                "Instance features are required to generate label features!"
+                            )
+                        label_feat = LabelEmbeddingFactory.pifa(prob.Y_label, prob.X_feat)
+
+                    clustering = Indexer.gen(
+                        label_feat,
+                        train_params=train_params.preliminary_indexer_params,
+                    )
+
+                    if tree_path is not None:
+                        os.makedirs(tree_path)
+                        clustering.save(tree_path)
+
+                else:
+                    # assert cluster chain in clustering is valid
+                    clustering = ClusterChain(clustering)
+                    if clustering[-1].shape[0] != prob.nr_labels:
+                        raise ValueError("nr_labels mismatch!")
             prelim_hierarchiy = [cc.shape[0] for cc in clustering]
             LOGGER.info("Hierarchical label tree: {}".format(prelim_hierarchiy))
 

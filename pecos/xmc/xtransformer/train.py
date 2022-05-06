@@ -712,6 +712,7 @@ def do_train(args):
               "model_shortcut": args.model_shortcut,
               "test_portion_for_training": args.test_portion_for_training,
               "val_portion_for_training": args.val_portion_for_training,
+              "include_Xval_Xtest_for_training": args.include_Xval_Xtest_for_training,
               }
 
     LOGGER.info(f"Manual configuration: {config}")
@@ -886,7 +887,7 @@ def do_train(args):
                                                  size=int(args.test_portion_for_training*len(test_corpus)),
                                                  replace=False)
             else:
-                kept_test_idx = np.arange(len(val_corpus))  # Keep everything
+                kept_test_idx = np.arange(len(test_corpus))  # Keep everything
 
             if args.val_portion_for_training is not None:
                 kept_val_idx = np.random.choice(np.arange(len(val_corpus)),
@@ -1004,6 +1005,7 @@ def do_train(args):
             memmap=args.memmap,
             saved_trn_dir=args.saved_trn_pt,
             saved_val_dir=args.saved_val_pt,
+            tree_path=args.tree_path,
         )
 
     xtf.save(f"{args.model_dir}/last")
