@@ -98,6 +98,7 @@ do
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================
+  best_round=$(tac ${experiment_dir}/run${seed}/train.log | grep -m 1 "Best validation accuracy at round " | cut -d\   -f6)
   # Restructure the saved models
   for dir_path in ${model_dir}/run${seed}/round* ${model_dir}/run${seed}/last
   do
@@ -109,32 +110,26 @@ do
       mv ${model_dir}/run${seed}/${dir}_tmp ${model_dir}/run${seed}/${dir}
     fi
   done
-  # Perform tests using every model from each fine-tuning round
-  for dir_path in ${model_dir}/run${seed}/round*
-  do
-    dir="$(basename -- ${dir_path})"
-    python -m pecos.xmc.xtransformer.predict \
-      --text-path ${X_test_txt_path} \
-      --saved-test-pt ${X_test_pt_path} \
-      --memmap "true" \
-      --model-folder ${model_dir}/run${seed}/${dir} \
-      --save-pred-path-mlabel ${experiment_dir}/run${seed}/${dir}_prediction_mlabel \
-      --save-pred-path-mclass ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
-      --multi-task \
-      --seed ${seed}
-  done
+  # Perform tests using the model from the fine-tuning round with best validation accuracy
+  dir_path=${model_dir}/run${seed}/round${best_round}
+  dir="$(basename -- ${dir_path})"
+  python -m pecos.xmc.xtransformer.predict \
+    --text-path ${X_test_txt_path} \
+    --saved-test-pt ${X_test_pt_path} \
+    --memmap "true" \
+    --model-folder ${model_dir}/run${seed}/${dir} \
+    --save-pred-path-mlabel ${experiment_dir}/run${seed}/${dir}_prediction_mlabel \
+    --save-pred-path-mclass ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
+    --multi-task \
+    --seed ${seed}
 
   #==================== eval ===================
-  # Calculate the test scores from every round
-  for dir_path in ${model_dir}/run${seed}/round*
-  do
-    dir="$(basename -- ${dir_path})"
-    echo ${dir} | tee -a ${experiment_dir}/run${seed}/test_scores.txt
-    python -m pecos.xmc.xtransformer.evaluate \
-      --y-class-true ${Y_test_main_path} \
-      --y-class-pred ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
-      | tee -a ${experiment_dir}/run${seed}/test_scores.txt
-  done
+  # Calculate the test scores
+  echo ${dir} | tee -a ${experiment_dir}/run${seed}/test_scores.txt
+  python -m pecos.xmc.xtransformer.evaluate \
+    --y-class-true ${Y_test_main_path} \
+    --y-class-pred ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
+    | tee -a ${experiment_dir}/run${seed}/test_scores.txt
   # Calculate and log the final best validation score and corresponding test score from this run
   python -m pecos.xmc.xtransformer.final_metrics_collection \
     --experiment_dir ${experiment_dir}/run${seed} \

@@ -971,6 +971,11 @@ def do_train(args):
 
     xtf.save(f"{args.model_dir}/last")
 
+    if args.trn_class_path is not None and args.trn_label_path:
+        # Output best vaidation score for multi-task problem
+        print("Final scores: ")
+        extract_train_performance_logs(args.experiment_dir)
+
     if args.wandb_sweep == "yes":
         # Log best validation scores, tranining scores within rounds,
         # convenient for sweeping (having all logs in 1 training script)

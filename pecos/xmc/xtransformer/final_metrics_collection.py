@@ -26,7 +26,7 @@ def main():
 
     best_val_acc, best_val_index, final_train_acc = extract_train_performance_logs(experiment_dir)
 
-    final_test_acc = extract_test_performance(best_val_index, experiment_dir)
+    final_test_acc = extract_test_performance(experiment_dir)
 
     if args.wandb_username is not None:
         import wandb
@@ -43,13 +43,12 @@ def main():
         wandb.run.summary["final_test_acc"] = final_test_acc
 
 
-def extract_test_performance(best_val_index, experiment_dir):
-    # Extract test scores
+def extract_test_performance(experiment_dir):
+    # Extract test score
     with open(f"{experiment_dir}/test_scores.txt", "r") as file:
         test_strs = file.readlines()
     test_strs = [x for x in test_strs if x.startswith("\t")]
-    test_score_per_round = [float(re.search('Multi-class accuracy: (.+?)\n', text).group(1)) for text in test_strs]
-    final_test_acc = test_score_per_round[best_val_index]
+    final_test_acc = [float(re.search('Multi-class accuracy: (.+?)\n', text).group(1)) for text in test_strs][0]
     print(f"Test accuracy: {final_test_acc}")
     return final_test_acc
 
