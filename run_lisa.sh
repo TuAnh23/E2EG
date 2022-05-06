@@ -14,7 +14,6 @@ module purge
 module load 2021
 module load Anaconda3/2021.05
 
-echo 1 | sudo tee /proc/sys/vm/overcommit_memory
 head /proc/sys/vm/overcommit_memory
 
 # Your job starts in the directory where you call sbatch

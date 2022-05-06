@@ -94,6 +94,7 @@ do
       --freeze-mclass-head-range "None" \
       --include-Xval-Xtest-for-training "true" \
       --model-shortcut "distilbert-base-uncased" \
+      --include-additional-mclass-round-HEAD "true" \
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================
