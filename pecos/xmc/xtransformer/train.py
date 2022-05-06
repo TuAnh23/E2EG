@@ -710,6 +710,8 @@ def do_train(args):
               "include_additional_mclass_round": args.include_additional_mclass_round,
               "include_additional_mclass_round_HEAD": args.include_additional_mclass_round_HEAD,
               "model_shortcut": args.model_shortcut,
+              "test_portion_for_training": args.test_portion_for_training,
+              "val_portion_for_training": args.val_portion_for_training,
               }
 
     LOGGER.info(f"Manual configuration: {config}")
