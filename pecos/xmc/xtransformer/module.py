@@ -152,9 +152,9 @@ class XMCDataset(Dataset):
             self.nr_inst = len(glob.glob1(self.data_path, "*.pt"))
 
         if label_values is not None and label_values.size(0) != self.nr_inst:
-            raise ValueError("First dimension mismatch between features and label_values")
+            raise ValueError(f"First dimension mismatch between features {self.nr_inst} and label_values {label_values.size(0)}")
         if label_indices is not None and label_indices.size(0) != self.nr_inst:
-            raise ValueError("First dimension mismatch between features and label_indices")
+            raise ValueError(f"First dimension mismatch between features {self.nr_inst} and label_indices {label_indices.size(0)}")
 
         self.label_values = label_values
         self.label_indices = label_indices

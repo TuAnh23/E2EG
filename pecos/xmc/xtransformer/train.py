@@ -39,6 +39,11 @@ def parse_arguments():
             return None
         return value
 
+    def none_or_float(value: str):
+        if value.lower() == 'none':
+            return None
+        return float(value)
+
     def str_to_bool(value: str):
         if value.lower() == 'yes' or value.lower() == 'true':
             return True
@@ -434,6 +439,22 @@ def parse_arguments():
              "true/yes or false/no",
     )
     parser.add_argument(
+        "--test-portion-for-training",
+        type=none_or_float,
+        default=None,
+        help="For multi-task in transductive setting: "
+             "the portion of test data used to learn the neighborhood prediction task."
+             "Default use everthing",
+    )
+    parser.add_argument(
+        "--val-portion-for-training",
+        type=none_or_float,
+        default=None,
+        help="For multi-task in transductive setting: "
+             "the portion of validation data used to learn the neighborhood prediction task."
+             "Default use everthing",
+    )
+    parser.add_argument(
         "--cache-dir",
         default="",
         metavar="PATH",
@@ -785,22 +806,22 @@ def do_train(args):
     else:
         Y_val_mclass = None
 
-    # Load test feature if given
-    if args.test_feat_path and use_tfidf_feat:
+    # Load test feature if given and needed in transductive setting
+    if args.test_feat_path and use_tfidf_feat and args.include_Xval_Xtest_for_training:
         X_test = smat_util.load_matrix(args.test_feat_path, dtype=np.float32)
         LOGGER.info("Loaded test feature matrix with shape={}".format(X_test.shape))
     else:
         X_test = None
 
-    # Load test labels if given
-    if args.test_label_path:
+    # Load test labels if given and needed in transductive setting
+    if args.test_label_path and args.include_Xval_Xtest_for_training:
         Y_test_mlabel = smat_util.load_matrix(args.test_label_path, dtype=np.float32)
         LOGGER.info("Loaded test label matrix with shape={}".format(Y_test_mlabel.shape))
     else:
         Y_test_mlabel = None
 
-    # Load test classes if given
-    if args.test_class_path:
+    # Load test classes if given and needed in transductive setting
+    if args.test_class_path and args.include_Xval_Xtest_for_training:
         Y_test_mclass = smat_util.load_matrix(args.test_class_path, dtype=np.float32)
         LOGGER.info("Loaded test class matrix with shape={}".format(Y_test_mclass.shape))
     else:
@@ -825,8 +846,8 @@ def do_train(args):
     else:
         val_corpus = None
 
-    # Load test text if given
-    if args.test_text_path:
+    # Load test text if given and needed in transductive setting
+    if args.test_text_path and args.include_Xval_Xtest_for_training:
         test_corpus = Preprocessor.load_data_from_file(
             args.test_text_path,
             label_text_path=None,
@@ -858,17 +879,31 @@ def do_train(args):
         # This is a multi-task problem
         if args.include_Xval_Xtest_for_training:
             # Include val and test to the training data, except for the mclass target
-            trn_corpus = trn_corpus + val_corpus + test_corpus
+            if args.test_portion_for_training is not None:
+                kept_test_idx = np.random.choice(np.arange(len(test_corpus)),
+                                                 size=int(args.test_portion_for_training*len(test_corpus)),
+                                                 replace=False)
+            else:
+                kept_test_idx = np.arange(len(val_corpus))  # Keep everything
+
+            if args.val_portion_for_training is not None:
+                kept_val_idx = np.random.choice(np.arange(len(val_corpus)),
+                                                size=int(args.val_portion_for_training * len(val_corpus)),
+                                                replace=False)
+            else:
+                kept_val_idx = np.arange(len(val_corpus))  # Keep everything
+
+            trn_corpus = trn_corpus + [val_corpus[i] for i in kept_val_idx] + [test_corpus[i] for i in kept_test_idx]
             Y_trn_mclass = np.concatenate(
                 (Y_trn_mclass,
-                 np.full(shape=Y_val_mclass.shape, fill_value=np.nan),  # Do not include mclass target for val data
-                 np.full(shape=Y_test_mclass.shape, fill_value=np.nan),  # Do not include mclass target for test data
+                 np.full(shape=Y_val_mclass.shape, fill_value=np.nan)[kept_val_idx],  # Do not include mclass target for val data
+                 np.full(shape=Y_test_mclass.shape, fill_value=np.nan)[kept_test_idx],  # Do not include mclass target for test data
                 ),
                 axis=0)
-            Y_trn_mlabel = vstack([Y_trn_mlabel, Y_val_mlabel, Y_test_mlabel])
+            Y_trn_mlabel = vstack([Y_trn_mlabel, Y_val_mlabel[kept_val_idx], Y_test_mlabel[kept_test_idx]])
 
             if use_tfidf_feat:
-                X_trn = vstack([X_trn, X_val, X_test])
+                X_trn = vstack([X_trn, X_val[kept_val_idx], X_test[kept_test_idx]])
 
             LOGGER.info("Transductive: include features and topology of nodes in validation set and test set "
                         "when training (i.e., only left out the mclass target)")

@@ -95,6 +95,8 @@ do
       --include-Xval-Xtest-for-training "true" \
       --model-shortcut "distilbert-base-uncased" \
       --include-additional-mclass-round-HEAD "true" \
+      --test-portion-for-training "None" \
+      --val-portion-for-training "None" \
       |& tee ${experiment_dir}/run${seed}/train.log
 
   #==================== test ===================
