@@ -50,15 +50,18 @@ username=tuanh
 projectname="UvA_Thesis"
 # Save fixed-parsed-arguments of the training scripts (which do not need sweeping over) to a json file
 python -m args_to_json \
-    --trn-text-path ${X_trn_txt_path} \
+	  --trn-text-path ${X_trn_txt_path} \
     --trn-feat-path ${X_trn_npz_path} \
     --trn-label-path ${Y_trn_neighbor_path} \
     --trn-class-path ${Y_trn_main_path} \
-    --tst-text-path ${X_val_txt_path} \
-    --tst-feat-path ${X_val_npz_path} \
-    --tst-label-path ${Y_val_neighbor_path} \
-    --tst-class-path ${Y_val_main_path} \
-    --model-dir ${model_dir}/run${seed} \
+    --val-text-path ${X_val_txt_path} \
+    --val-feat-path ${X_val_npz_path} \
+    --val-label-path ${Y_val_neighbor_path} \
+    --val-class-path ${Y_val_main_path} \
+    --test-text-path ${X_test_txt_path} \
+    --test-feat-path ${X_test_npz_path} \
+    --test-label-path ${Y_test_neighbor_path} \
+    --test-class-path ${Y_test_main_path} \
     --experiment-dir ${experiment_dir}/run${seed} \
     --cache-dir ${cache_dir} \
     --params-path ${params_path} \
@@ -68,10 +71,12 @@ python -m args_to_json \
     --memmap "true" \
     --saved-trn-pt ${X_trn_pt_path} \
     --saved-val-pt ${X_val_pt_path} \
-    --weight-loss-strategy "include_mclass_loss_later_at_round_2" \
+    --weight-loss-strategy "None" \
     --include-Xval-Xtest-for-training "true" \
     --model-shortcut "distilbert-base-uncased" \
     --include-additional-mclass-round-HEAD "true" \
+    --test-portion-for-training "None" \
+    --val-portion-for-training "None" \
     --wandb-username tuanh \
     --wandb-sweep yes \
     --save_json_path ${sweep_config_dir}/training_config.json \
