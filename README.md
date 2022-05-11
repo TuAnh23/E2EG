@@ -104,6 +104,7 @@ python -u baseline_models/bert_classifier.py \
   --model_dir models/bert_classifier \
   --raw-text-path data/proc_data_multi_task/ogbn-arxiv/X.all.txt \
   --text_tokenizer_path data/proc_data_multi_task/ogbn-arxiv/xrt_models/text_encoder/text_tokenizer \
+  --dataset ${dataset} \
   | tee -a experiments/bert_classifier/train.log
 ```
 

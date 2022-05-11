@@ -62,6 +62,7 @@ python -m args_to_json \
     --test-feat-path ${X_test_npz_path} \
     --test-label-path ${Y_test_neighbor_path} \
     --test-class-path ${Y_test_main_path} \
+    --model-dir ${model_dir}/run${seed} \
     --experiment-dir ${experiment_dir}/run${seed} \
     --cache-dir ${cache_dir} \
     --params-path ${params_path} \
@@ -83,8 +84,10 @@ python -m args_to_json \
     --swept_args "numb_layers_mclass_pred|mclass_pred_dropout_prob|mclass_pred_batchnorm|mclass_pred_hidden_size"
 
 ##==================== setup sweep ===================
-wandb sweep --entity ${username} --project ${projectname} ${sweep_config_dir}/sweep.yaml |& tee ${sweep_config_dir}/sweep_info.txt
+if [ ! -f ${sweep_config_dir}/sweep_info.txt ]; then
+  wandb sweep --entity ${username} --project ${projectname} ${sweep_config_dir}/sweep.yaml |& tee ${sweep_config_dir}/sweep_info.txt
+fi
 sweepID=$(grep 'wandb: Created sweep with ID: ' ${sweep_config_dir}/sweep_info.txt | sed 's/^.*: //')
 echo "sweepID ${sweepID}"
 #==================== start sweep ===================
-wandb agent ${username}/${projectname}/${sweepID}
+wandb agent --count 4 ${username}/${projectname}/${sweepID}
