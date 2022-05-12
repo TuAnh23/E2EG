@@ -439,18 +439,18 @@ class TransformerMatcher(pecos.BaseClass):
         use_cache = cache_dir if cache_dir else None
 
         if not os.path.isdir(save_path):
-            os.mkdir(save_path)
-            hf_hub_download(repo_id=model_shortcut, filename="config.json", cache_dir=save_path,
-                            force_filename="config.json")
-            hf_hub_download(repo_id=model_shortcut, filename="pytorch_model.bin", cache_dir=save_path,
-                            force_filename="pytorch_model.bin")
-            hf_hub_download(repo_id=model_shortcut, filename="tokenizer.json", cache_dir=save_path,
-                            force_filename="tokenizer.json")
-            if model_shortcut != "roberta-base":
+            os.makedirs(save_path)
+            hf_hub_download(repo_id=model_shortcut, filename="config.json", cache_dir=save_path, force_filename="config.json")
+            hf_hub_download(repo_id=model_shortcut, filename="pytorch_model.bin", cache_dir=save_path, force_filename="pytorch_model.bin")
+            hf_hub_download(repo_id=model_shortcut, filename="tokenizer.json", cache_dir=save_path, force_filename="tokenizer.json")
+            if model_shortcut in ["bert-base-uncased", "distilbert-base-uncased"]:
+                hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path, force_filename="tokenizer_config.json")
+                hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path, force_filename="vocab.txt")
+            if model_shortcut == "sentence-transformers/all-distilroberta-v1":
                 hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path,
                                 force_filename="tokenizer_config.json")
-                hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path,
-                                force_filename="vocab.txt")
+                hf_hub_download(repo_id=model_shortcut, filename="vocab.json", cache_dir=save_path,
+                                force_filename="vocab.json")
         LOGGER.info("Load model from {}.".format(save_path))
 
         # AutoConfig will infer transformer type from shortcut
@@ -2121,13 +2121,18 @@ class TransformerMultiTask(pecos.BaseClass):
         use_cache = cache_dir if cache_dir else None
 
         if not os.path.isdir(save_path):
-            os.mkdir(save_path)
+            os.makedirs(save_path)
             hf_hub_download(repo_id=model_shortcut, filename="config.json", cache_dir=save_path, force_filename="config.json")
             hf_hub_download(repo_id=model_shortcut, filename="pytorch_model.bin", cache_dir=save_path, force_filename="pytorch_model.bin")
             hf_hub_download(repo_id=model_shortcut, filename="tokenizer.json", cache_dir=save_path, force_filename="tokenizer.json")
-            if model_shortcut != "roberta-base":
+            if model_shortcut in ["bert-base-uncased", "distilbert-base-uncased"]:
                 hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path, force_filename="tokenizer_config.json")
                 hf_hub_download(repo_id=model_shortcut, filename="vocab.txt", cache_dir=save_path, force_filename="vocab.txt")
+            if model_shortcut == "sentence-transformers/all-distilroberta-v1":
+                hf_hub_download(repo_id=model_shortcut, filename="tokenizer_config.json", cache_dir=save_path,
+                                force_filename="tokenizer_config.json")
+                hf_hub_download(repo_id=model_shortcut, filename="vocab.json", cache_dir=save_path,
+                                force_filename="vocab.json")
 
         LOGGER.info("Load model from {}.".format(save_path))
 
@@ -3015,11 +3020,12 @@ class TransformerMultiTask(pecos.BaseClass):
                         )
                         try:
                             import wandb
-                            wandb.log({f"train_loss_mlabel_round{finetune_round_th}": cur_loss_mlabel,
-                                       f"train_loss_mclass_round{finetune_round_th}": cur_loss_mclass,
-                                       f"learning_rate_round{finetune_round_th}": scheduler.get_last_lr()[0],
-                                       f"global_step_round{finetune_round_th}": global_step})
-                            wandb.watch(self.text_encoder)
+                            if global_step % (train_params.logging_steps*5) == 0:
+                                wandb.log({f"train_loss_mlabel_round{finetune_round_th}": cur_loss_mlabel,
+                                           f"train_loss_mclass_round{finetune_round_th}": cur_loss_mclass,
+                                           f"learning_rate_round{finetune_round_th}": scheduler.get_last_lr()[0],
+                                           f"global_step_round{finetune_round_th}": global_step})
+                                wandb.watch(self.text_encoder)
                         except:
                             pass
                         logging_loss_mlabel = tr_loss_mlabel

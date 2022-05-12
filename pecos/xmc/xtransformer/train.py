@@ -275,7 +275,8 @@ def parse_arguments():
     parser.add_argument(
         "--model-shortcut",
         default=None,
-        help="pre-trained transformer model name shortcut for download (default bert-base-uncased)",
+        help="pre-trained transformer model name shortcut for download (default bert-base-uncased). "
+             "[bert-base-uncased, distilbert-base-uncased, sentence-transformers/all-distilroberta-v1]",
     )
     parser.add_argument(
         "--init-model-dir",
