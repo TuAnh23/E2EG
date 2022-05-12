@@ -488,10 +488,10 @@ def parse_arguments():
     )
     parser.add_argument(
         "--hidden-dropout-prob",
-        default=0.1,
+        default=None,
         metavar="VAL",
-        type=float,
-        help="hidden dropout prob in deep transformer models.",
+        type=none_or_float,
+        help="hidden dropout prob in deep transformer models. default 0.1",
     )
     parser.add_argument(
         "--batch-size",
@@ -509,10 +509,9 @@ def parse_arguments():
     )
     parser.add_argument(
         "--learning-rate",
-        default=1e-4,
-        metavar="VAL",
-        type=float,
-        help="maximum learning rate for Adam.",
+        default=None,
+        type=none_or_float,
+        help="maximum learning rate for Adam. Default 6e-5",
     )
     parser.add_argument(
         "--weight-decay",
@@ -710,6 +709,8 @@ def do_train(args):
               "include_additional_mclass_round": args.include_additional_mclass_round,
               "include_additional_mclass_round_HEAD": args.include_additional_mclass_round_HEAD,
               "model_shortcut": args.model_shortcut,
+              "learning_rate": args.learning_rate,
+              "hidden_dropout_prob": args.hidden_dropout_prob,
               "test_portion_for_training": args.test_portion_for_training,
               "val_portion_for_training": args.val_portion_for_training,
               "include_Xval_Xtest_for_training": args.include_Xval_Xtest_for_training,
@@ -762,6 +763,10 @@ def do_train(args):
 
     if args.model_shortcut is not None:
         train_params.matcher_params_chain.model_shortcut = args.model_shortcut
+    if args.learning_rate is not None:
+        train_params.matcher_params_chain.learning_rate = args.learning_rate
+    if args.hidden_dropout_prob is not None:
+        train_params.matcher_params_chain.hidden_dropout_prob = args.hidden_dropout_prob
 
     torch_util.set_seed(args.seed)
     LOGGER.info("Setting random seed {}".format(args.seed))
