@@ -119,12 +119,12 @@ def train(model, train_X, train_y, val_X, val_y, learning_rate, epochs, batch_si
                 total_acc_val += acc
 
         print(
-            f'Epochs: {epoch_num + 1} | Train Loss: {total_loss_train / len(train_X): .3f} \
-                | Train Accuracy: {total_acc_train / len(train_X): .3f} \
-                | Val Loss: {total_loss_val / len(val_X): .3f} \
-                | Val Accuracy: {total_acc_val / len(val_X): .3f}')
+            f'Epochs: {epoch_num + 1} | Train Loss: {total_loss_train / len(train_X): .4f} \
+                | Train Accuracy: {total_acc_train / len(train_X): .4f} \
+                | Val Loss: {total_loss_val / len(val_X): .4f} \
+                | Val Accuracy: {total_acc_val / len(val_X): .4f}')
 
-        torch.save(model, model_dir + f'/e{epoch_num + 1:03d}val{total_acc_val / len(val_X):.3f}.pt')
+        torch.save(model, model_dir + f'/e{epoch_num + 1:03d}val{total_acc_val / len(val_X):.4f}.pt')
 
 
 def evaluate(model, test_X, test_y):
@@ -151,7 +151,7 @@ def evaluate(model, test_X, test_y):
             acc = (output.argmax(dim=1) == test_label).sum().item()
             total_acc_test += acc
 
-    print(f'Test Accuracy: {total_acc_test / len(test_y): .3f}')
+    print(f'Test Accuracy: {total_acc_test / len(test_y): .4f}')
 
 
 def main():
@@ -193,7 +193,7 @@ def main():
     train_idx, valid_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]
 
     # Train the model
-    model = BertClassifier(num_classes=40, dropout=args.dropout, pretrain=args.pretrain)
+    model = BertClassifier(num_classes=torch.max(y)+1, dropout=args.dropout, pretrain=args.pretrain)
     train(model, [X[i] for i in train_idx], y[train_idx], [X[i] for i in valid_idx], y[valid_idx],
           args.learning_rate, args.epochs, args.batch_size, args.adam_epsilon, args.model_dir)
 
