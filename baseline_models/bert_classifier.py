@@ -62,6 +62,18 @@ class Dataset(torch.utils.data.Dataset):
         return batch_texts, batch_y
 
 
+def set_seed(seed=0):
+    """Set the random seed for torch.
+
+    Args:
+        seet (int, optional): random seed. Default 0
+    """
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    # If CUDA is not available, this is silently ignored.
+    torch.cuda.manual_seed_all(seed)
+
+
 def train(model, train_X, train_y, val_X, val_y, learning_rate, epochs, batch_size, adam_epsilon, model_dir):
     train, val = Dataset(train_X, train_y), Dataset(val_X, val_y)
 
@@ -127,7 +139,7 @@ def train(model, train_X, train_y, val_X, val_y, learning_rate, epochs, batch_si
         torch.save(model, model_dir + f'/e{epoch_num + 1:03d}val{total_acc_val / len(val_X):.4f}.pt')
 
 
-def evaluate(model, test_X, test_y):
+def evaluate(model, test_X, test_y, experiment_dir):
     test = Dataset(test_X, test_y)
 
     test_dataloader = torch.utils.data.DataLoader(test, batch_size=2)
@@ -138,6 +150,7 @@ def evaluate(model, test_X, test_y):
     if use_cuda:
         model = model.cuda()
 
+    y_pred = []
     total_acc_test = 0
     with torch.no_grad():
 
@@ -148,9 +161,12 @@ def evaluate(model, test_X, test_y):
 
             output = model(input_id, mask)
 
+            y_pred.append(output.argmax(dim=1).cpu())
             acc = (output.argmax(dim=1) == test_label).sum().item()
             total_acc_test += acc
 
+    print(np.stack(y_pred))
+    np.save(f"{experiment_dir}/y_pred.npy", np.concatenate(y_pred))
     print(f'Test Accuracy: {total_acc_test / len(test_y): .4f}')
 
 
@@ -158,8 +174,11 @@ def main():
     parser = argparse.ArgumentParser(description='Train BERT classifier baseline. Default hyper-params are similar '
                                      + 'to the BERT model used for GIANT.')
     parser.add_argument('--model_dir', type=str, default='./')
+    parser.add_argument('--experiment_dir', type=str, default='./')
     parser.add_argument('--dataset', type=str, default='ogbn-arxiv')
     parser.add_argument('--data_root_dir', type=str, default='data')
+    parser.add_argument("--seed", type=int, metavar="INT", default=0,
+                        help="random seed for initialization")
     parser.add_argument('--raw-text-path', type=str, required=True,
                         help="Path of raw text (.txt file, each raw correspond to a node)")
     parser.add_argument('--truncate_length', type=int, default=128)
@@ -172,6 +191,8 @@ def main():
     parser.add_argument('--pretrain', type=str, default='bert-base-uncased')
     args = parser.parse_args()
     print(args)
+
+    set_seed(args.seed)
 
     # Get raw text input
     with open(args.raw_text_path, "r") as fin:
@@ -206,7 +227,7 @@ def main():
             best_model_path = os.path.join(args.model_dir, filename)
     print(f'Best model path: {best_model_path}')
     best_model = torch.load(best_model_path)
-    evaluate(best_model, [X[i] for i in test_idx], y[test_idx])
+    evaluate(best_model, [X[i] for i in test_idx], y[test_idx], experiment_dir=args.experiment_dir)
 
 
 if __name__ == "__main__":
