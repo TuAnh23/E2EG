@@ -165,7 +165,6 @@ def evaluate(model, test_X, test_y, experiment_dir):
             acc = (output.argmax(dim=1) == test_label).sum().item()
             total_acc_test += acc
 
-    print(np.stack(y_pred))
     np.save(f"{experiment_dir}/y_pred.npy", np.concatenate(y_pred))
     print(f'Test Accuracy: {total_acc_test / len(test_y): .4f}')
 

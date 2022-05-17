@@ -67,6 +67,11 @@ start_seed=0
 end_seed=runs-1
 for (( seed=$start_seed; seed<=$end_seed; seed++ ))
 do
+  if [ -d "${experiment_dir}/run${seed}" ]
+	then
+	  echo "Results for run${seed} exists, skip this run"
+	  continue 1
+	fi
   mkdir ${model_dir}/run${seed}
   mkdir ${experiment_dir}/run${seed}
   python -u baseline_models/bert_classifier.py \
@@ -76,5 +81,6 @@ do
     --raw-text-path ${data_dir}/X.all.txt \
     --text_tokenizer_path ${data_dir}/xrt_models/text_encoder/text_tokenizer \
     --dataset ${dataset} \
+    --epochs 5 \
     | tee -a ${experiment_dir}/run${seed}/train.log
 done
