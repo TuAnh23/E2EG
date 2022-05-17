@@ -70,6 +70,7 @@ python -m args_to_json \
     --seed ${seed} \
     --tree-path ${tree_path} \
     --memmap "true" \
+    --dataset $(basename $data_dir) \
     --saved-trn-pt ${X_trn_pt_path} \
     --saved-val-pt ${X_val_pt_path} \
     --weight-loss-strategy "None" \

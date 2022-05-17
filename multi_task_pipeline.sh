@@ -81,6 +81,7 @@ do
       --verbose-level 3 \
       --tree-path ${tree_path} \
       --memmap "true" \
+      --dataset $(basename $data_dir) \
       --saved-trn-pt ${X_trn_pt_path} \
       --saved-val-pt ${X_val_pt_path} \
       --seed ${seed} \
@@ -131,6 +132,7 @@ do
   python -m pecos.xmc.xtransformer.evaluate \
     --y-class-true ${Y_test_main_path} \
     --y-class-pred ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
+    --dataset $(basename $data_dir) \
     | tee -a ${experiment_dir}/run${seed}/test_scores.txt
   # Calculate and log the final best validation score and corresponding test score from this run
   python -m pecos.xmc.xtransformer.final_metrics_collection \

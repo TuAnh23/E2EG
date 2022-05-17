@@ -1009,6 +1009,7 @@ class XTransformerMultiTask(pecos.BaseClass):
         memmap=False,
         saved_trn_dir=None,
         saved_val_dir=None,
+        evaluator=None,
         **kwargs,
     ):
         """Train the XR-Transformer model with the given input data.
@@ -1411,6 +1412,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     kept_sample=kept_sample,
                     saved_trn_dir_filtered=saved_trn_dir_filtered,
                     saved_trn_pt_filtered=saved_trn_pt_filtered,
+                    evaluator=evaluator,
                 )
 
                 if (include_additional_mclass_round or include_additional_mclass_round_HEAD) \

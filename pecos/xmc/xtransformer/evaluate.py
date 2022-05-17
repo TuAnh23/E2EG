@@ -13,6 +13,7 @@ import logging
 import numpy as np
 
 from pecos.utils import logging_util, smat_util
+from ogb.nodeproppred import Evaluator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +46,11 @@ def parse_arguments():
              f"{', '.join([str(k) + ' for ' + logging.getLevelName(v) for k, v in logging_util.log_levels.items()])}, "
              f"default 1",
     )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-arxiv"
+    )
     return parser
 
 
@@ -54,12 +60,15 @@ def do_evaluate(args):
     Args:
         args (argparse.Namespace): Command line arguments parsed by `parser.parse_args()`
     """
+    evaluator = Evaluator(name=args.dataset)
+
     y_class_true = smat_util.load_matrix(args.y_class_true, dtype=np.float32)
-    y_class_pred = smat_util.load_matrix(args.y_class_pred, dtype=np.float32)
+    y_class_pred = smat_util.load_matrix(args.y_class_pred, dtype=np.float32).argmax(axis=1)
 
-    test_metrics_mclass = smat_util.MetricsMClass.generate(y_class_true, y_class_pred.argmax(axis=1))
+    result_dict = evaluator.eval({'y_true': np.expand_dims(y_class_true, axis=1),
+                                  'y_pred': np.expand_dims(y_class_pred, axis=1)})
 
-    print(f"\tMulti-class accuracy: {test_metrics_mclass.acc * 100}\n")
+    print(f"\tMulti-class accuracy: {result_dict['acc'] * 100}\n")
 
 
 if __name__ == "__main__":

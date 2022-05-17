@@ -29,6 +29,7 @@ from .model import XTransformer, XTransformerMultiTask
 from .module import MLProblemWithText, MLMultiTaskProblemWithText
 
 from .final_metrics_collection import extract_train_performance_logs
+from ogb.nodeproppred import Evaluator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -667,6 +668,11 @@ def parse_arguments():
         default="no",
         help="Whether running the script from a wandb sweep",
     )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="ogbn-arxiv"
+    )
 
     return parser
 
@@ -964,6 +970,7 @@ def do_train(args):
             val_prob = None
 
     if args.trn_class_path is not None and args.trn_label_path:
+        evaluator = Evaluator(name=args.dataset)
         # This is a multi-task problem
         mclass_pred_hyperparam = {"numb_layers_mclass_pred": args.numb_layers_mclass_pred,
                                   "mclass_pred_dropout_prob": args.mclass_pred_dropout_prob,
@@ -994,6 +1001,7 @@ def do_train(args):
             memmap=args.memmap,
             saved_trn_dir=args.saved_trn_pt,
             saved_val_dir=args.saved_val_pt,
+            evaluator=evaluator,
         )
     else:
         # XMC problem

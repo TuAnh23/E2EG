@@ -2724,7 +2724,7 @@ class TransformerMultiTask(pecos.BaseClass):
     def fine_tune_encoder(self, prob, val_prob=None, val_csr_codes=None,
                           finetune_round_th=None, mclass_weight=1,
                           include_Xval_Xtest_for_training=False, include_mlabel=True,
-                          memmap=False):
+                          memmap=False, evaluator=None):
         """Fine tune the transformer text_encoder
 
         Args:
@@ -3071,8 +3071,8 @@ class TransformerMultiTask(pecos.BaseClass):
                                     val_pred_label,
                                     topk=pred_params.only_topk,
                                 )
-                                val_metrics_mclass = smat_util.MetricsMClass.generate(val_prob.Y_class,
-                                                                                      val_pred_class.argmax(axis=1))
+                                val_metrics_mclass = evaluator.eval({'y_true': np.expand_dims(val_prob.Y_class, axis=1),
+                                                                     'y_pred': np.expand_dims(val_pred_class.argmax(axis=1), axis=1)})
 
                                 LOGGER.info(
                                     "| {} mlabel-test-prec {}".format(
@@ -3167,6 +3167,7 @@ class TransformerMultiTask(pecos.BaseClass):
         kept_sample=None,
         saved_trn_dir_filtered=None,
         saved_trn_pt_filtered=None,
+        evaluator=None,
         **kwargs,
     ):
         """Train the transformer matcher
@@ -3382,7 +3383,7 @@ class TransformerMultiTask(pecos.BaseClass):
             matcher.fine_tune_encoder(prob, val_prob=None, val_csr_codes=val_csr_codes,
                                       finetune_round_th=finetune_round_th, mclass_weight=mclass_weight,
                                       include_Xval_Xtest_for_training=include_Xval_Xtest_for_training,
-                                      include_mlabel=include_mlabel, memmap=memmap)
+                                      include_mlabel=include_mlabel, memmap=memmap, evaluator=evaluator)
             if os.path.exists(train_params.checkpoint_dir):
                 LOGGER.info(
                     "Reload the best checkpoint from {}".format(train_params.checkpoint_dir)
@@ -3467,10 +3468,11 @@ class TransformerMultiTask(pecos.BaseClass):
             if include_Xval_Xtest_for_training:
                 # Only calculate the accuracy on the train split with given mclass target
                 non_nan_idx = ~np.isnan(prob.Y_class)
-                train_metrics_mclass = smat_util.MetricsMClass.generate(prob.Y_class[non_nan_idx].astype(int, copy=False),
-                                                                        P_class_trn.argmax(axis=1)[non_nan_idx])
+                train_metrics_mclass = evaluator.eval({'y_true': np.expand_dims(prob.Y_class[non_nan_idx].astype(int, copy=False), axis=1),
+                                                       'y_pred': np.expand_dims(P_class_trn.argmax(axis=1)[non_nan_idx], axis=1)})
             else:
-                train_metrics_mclass = smat_util.MetricsMClass.generate(prob.Y_class, P_class_trn.argmax(axis=1))
+                train_metrics_mclass = evaluator.eval({'y_true': np.expand_dims(prob.Y_class, axis=1),
+                                                       'y_pred': np.expand_dims(P_class_trn.argmax(axis=1), axis=1)})
             avr_train_beam = (
                 1 if csr_codes is None else csr_codes.nnz / csr_codes.shape[0]
             )
@@ -3488,14 +3490,15 @@ class TransformerMultiTask(pecos.BaseClass):
                 )
             )
             LOGGER.info(
-                "| mclass-train-acc {:4.2f}".format(100 * train_metrics_mclass.acc),
+                "| mclass-train-acc {:4.2f}".format(100 * train_metrics_mclass['acc']),
             )
 
             # compute performance on validation set
             val_type = "man" if val_csr_codes is not None else "all"
             val_metrics_mlabel = smat_util.MetricsMLabel.generate(val_prob.Y_label, P_label_val,
                                                                   topk=pred_params.only_topk)
-            val_metrics_mclass = smat_util.MetricsMClass.generate(val_prob.Y_class, P_class_val.argmax(axis=1))
+            val_metrics_mclass = evaluator.eval({'y_true': np.expand_dims(val_prob.Y_class, axis=1),
+                                                 'y_pred': np.expand_dims(P_class_val.argmax(axis=1), axis=1)})
             avr_val_beam = (
                 1 if val_csr_codes is None else val_csr_codes.nnz / val_csr_codes.shape[0]
             )
@@ -3513,14 +3516,14 @@ class TransformerMultiTask(pecos.BaseClass):
                 )
             )
             LOGGER.info(
-                "| mclass-test-acc {:4.2f}".format(100 * val_metrics_mclass.acc),
+                "| mclass-test-acc {:4.2f}".format(100 * val_metrics_mclass['acc']),
             )
 
             avg_matcher_train_prec_mlabel = np.mean(train_metrics_mlabel.prec)
-            train_acc_mclass = train_metrics_mclass.acc
+            train_acc_mclass = train_metrics_mclass['acc']
 
             avg_matcher_val_prec_mlabel = np.mean(val_metrics_mlabel.prec)
-            val_acc_mclass = val_metrics_mclass.acc
+            val_acc_mclass = val_metrics_mclass['acc']
 
             final_performance_log_str = "Final performance in round {}: avg_train_prec_mlabel={:4.4f}, train_acc_mclass={:4.4f}, avg_val_prec_mlabel={:4.4f}, val_acc_mclass={:4.4f},".format(
                     finetune_round_th,
