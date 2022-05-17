@@ -64,4 +64,5 @@ trap 'cp -r ${experiment_dir} $HOME/UvA_Thesis_pecosEXT/experiments; cp -r ${mod
 # Run train-val-test pipeline
 params_path=data/proc_data_multi_task/params_mtask_${dataset}${subset}.json
 bash multi_task_pipeline.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
+bash encode_mtask.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} ${runs}
 #bash hyperparams_sweep.sh ${data_dir}${subset} ${model_dir} ${experiment_dir} ${cache_dir} ${params_path} sweep_configs/${experiment_name}

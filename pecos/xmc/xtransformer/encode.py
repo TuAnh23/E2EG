@@ -57,10 +57,10 @@ def parse_arguments():
         help="The path where the embeddings will be written.",
     )
     parser.add_argument(
-        "--saved-test-pt",
+        "--saved-text-pt",
         default=None,
         metavar="PATH",
-        help="dir to save/load tokenized test tensor",
+        help="dir to save/load tokenized text tensor",
     )
     parser.add_argument(
         "--memmap",
@@ -131,7 +131,7 @@ def do_encode(args):
         use_gpu=args.use_gpu,
         max_pred_chunk=args.max_pred_chunk,
         memmap=args.memmap,
-        saved_test_dir=args.saved_test_pt,
+        saved_text_dir=args.saved_text_pt,
     )
 
     smat_util.save_matrix(args.save_emb_path, X_emb)

@@ -697,7 +697,7 @@ class XTransformer(pecos.BaseClass):
         X_text,
         pred_params=None,
         memmap=False,
-        saved_test_dir=None,
+        saved_text_dir=None,
         **kwargs,
     ):
         """Use the Transformer text encoder to generate embeddings for input data.
@@ -720,8 +720,8 @@ class XTransformer(pecos.BaseClass):
         """
         temp_dir = tempfile.TemporaryDirectory()
         if memmap:
-            if saved_test_dir is None:
-                saved_test_dir = f"{temp_dir.name}/X_test"
+            if saved_text_dir is None:
+                saved_text_dir = f"{temp_dir.name}/X_tokenized"
 
         saved_pt = kwargs.get("saved_pt", None)
         batch_size = kwargs.get("batch_size", 8)
@@ -755,18 +755,18 @@ class XTransformer(pecos.BaseClass):
                     max_length=encoder_pred_params.truncate_length,
                 )
         else:
-            if os.path.exists(saved_test_dir):
-                LOGGER.info("test tensors available at {}".format(saved_test_dir))
+            if os.path.exists(saved_text_dir):
+                LOGGER.info("tokenized tensors available at {}".format(saved_text_dir))
             else:
                 self.text_encoder.text_to_tensor(
                     X_text,
                     num_workers=batch_gen_workers,
                     max_length=encoder_pred_params.truncate_length,
-                    saved_dir=saved_test_dir,
+                    saved_dir=saved_text_dir,
                     memmap=memmap,
                 )
-                LOGGER.info("test tensors saved to {}".format(saved_test_dir))
-            X_text = saved_test_dir
+                LOGGER.info("tokenized tensors saved to {}".format(saved_text_dir))
+            X_text = saved_text_dir
 
         self.text_encoder.to_device(device, n_gpu=n_gpu)
         _, embeddings = self.text_encoder.predict(
