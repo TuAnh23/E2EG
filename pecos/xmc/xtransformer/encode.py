@@ -15,7 +15,7 @@ import os
 from pecos.utils import cli, logging_util, smat_util
 from pecos.utils.featurization.text.preprocess import Preprocessor
 
-from .model import XTransformer
+from .model import XTransformer, XTransformerMultiTask
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,6 +68,12 @@ def parse_arguments():
         default=False,
         help="Whether to use memmap (i.e., lazily load text data tensor from disk) rather than having everything in RAM",
     )
+    parser.add_argument(
+        "--mtask",
+        type=str_to_bool,
+        default=False,
+        help="Whether the model used to encode the text was a multi-task model",
+    )
     # ======= Other parameters ========
     parser.add_argument(
         "--batch-size",
@@ -117,22 +123,33 @@ def do_encode(args):
     if os.path.isdir(args.save_emb_path):
         args.save_emb_path = os.path.join(args.save_emb_path, "embeddings.npy")
 
-    xtf = XTransformer.load(args.model_folder)
-
     # load instance feature and text
     X_text = Preprocessor.load_data_from_file(args.text_path, label_text_path=None, text_pos=0)[
         "corpus"
     ]
 
-    X_emb = xtf.encode(
-        X_text,
-        batch_size=args.batch_size,
-        batch_gen_workers=args.batch_gen_workers,
-        use_gpu=args.use_gpu,
-        max_pred_chunk=args.max_pred_chunk,
-        memmap=args.memmap,
-        saved_text_dir=args.saved_text_pt,
-    )
+    if args.mtask:
+        xtf = XTransformerMultiTask.load(args.model_folder)
+        X_emb = xtf.encode(
+            X_text,
+            batch_size=args.batch_size,
+            batch_gen_workers=args.batch_gen_workers,
+            use_gpu=args.use_gpu,
+            max_pred_chunk=args.max_pred_chunk,
+            memmap=args.memmap,
+            saved_text_dir=args.saved_text_pt,
+        )
+    else:
+        xtf = XTransformer.load(args.model_folder)
+        X_emb = xtf.encode(
+            X_text,
+            batch_size=args.batch_size,
+            batch_gen_workers=args.batch_gen_workers,
+            use_gpu=args.use_gpu,
+            max_pred_chunk=args.max_pred_chunk,
+            memmap=args.memmap,
+            saved_text_dir=args.saved_text_pt,
+        )
 
     smat_util.save_matrix(args.save_emb_path, X_emb)
 

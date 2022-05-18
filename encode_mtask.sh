@@ -69,5 +69,6 @@ do
       --memmap "true" \
       --batch-size 64 \
       --verbose-level 3 \
+      --mtask "true" \
       |& tee ${experiment_dir}/run${seed}/predict.log
 done

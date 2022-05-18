@@ -33,6 +33,12 @@ X_test_txt_path=${data_dir}/X.test.txt                      # test text
 X_test_npz_path=${data_dir}/X.test.tfidf.npz                # test tfidf feature
 X_test_pt_path=${data_dir}/X.test                           # save test tensors here
 
+Y_test_all_neighbor_path=${data_dir}/Y_neighbor.test_all.npz        # test_all label matrix
+Y_test_all_main_path=${data_dir}/Y_main.test_all.npy                # test_all class matrix
+X_test_all_txt_path=${data_dir}/X.test_all.txt                      # test_all text
+X_test_all_npz_path=${data_dir}/X.test_all.tfidf.npz                # test_all tfidf feature
+X_test_all_pt_path=${data_dir}/X.test_all                           # save test_all tensors here
+
 tree_path=${data_dir}/HierarchialLabelTree                  # save Hierarchial Label Tree here
 
 mkdir -p ${cache_dir}
@@ -117,8 +123,8 @@ do
   dir_path=${model_dir}/run${seed}/round${best_round}
   dir="$(basename -- ${dir_path})"
   python -m pecos.xmc.xtransformer.predict \
-    --text-path ${X_test_txt_path} \
-    --saved-test-pt ${X_test_pt_path} \
+    --text-path ${X_test_all_txt_path} \
+    --saved-test-pt ${X_test_all_pt_path} \
     --memmap "true" \
     --model-folder ${model_dir}/run${seed}/${dir} \
     --save-pred-path-mlabel ${experiment_dir}/run${seed}/${dir}_prediction_mlabel \
@@ -130,7 +136,7 @@ do
   # Calculate the test scores
   echo ${dir} | tee -a ${experiment_dir}/run${seed}/test_scores.txt
   python -m pecos.xmc.xtransformer.evaluate \
-    --y-class-true ${Y_test_main_path} \
+    --y-class-true ${Y_test_all_main_path} \
     --y-class-pred ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
     --dataset $(basename $data_dir) \
     | tee -a ${experiment_dir}/run${seed}/test_scores.txt

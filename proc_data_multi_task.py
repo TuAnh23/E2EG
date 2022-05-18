@@ -84,11 +84,12 @@ def main():
     # Apply the same filtering
     train_idx = np.intersect1d(train_idx.cpu().numpy(), Filtered_idx.cpu().numpy())  # Add [:x] to the end to create a tiny dataset with x nodes
     valid_idx = np.intersect1d(valid_idx.cpu().numpy(), Filtered_idx.cpu().numpy())
-    test_idx = np.intersect1d(test_idx.cpu().numpy(), Filtered_idx.cpu().numpy())
+    test_all_idx = test_idx.cpu().numpy()
+    test_idx = np.intersect1d(test_all_idx, Filtered_idx.cpu().numpy())
 
     print('Number of train nodes:{}'.format(len(train_idx)))
     print('Number of val nodes:{}'.format(len(valid_idx)))
-    print('Number of test nodes:{}'.format(len(test_idx)))
+    print('Number of test nodes:{}'.format(len(test_all_idx)))
 
 
     # Construct and save neighborhood-label matrix (adjacencey matrix) Y_neighbor.
@@ -96,12 +97,14 @@ def main():
     Y_csr_trn = Y_csr_all[train_idx]
     Y_csr_val = Y_csr_all[valid_idx]
     Y_csr_test = Y_csr_all[test_idx]
+    Y_csr_test_all = Y_csr_all[test_all_idx]
 
     smat_util.save_matrix(f"{save_data_dir}/Y_neighbor.trn.npz", Y_csr_trn)
     smat_util.save_matrix(f"{save_data_dir}/Y_neighbor.val.npz", Y_csr_val)
     smat_util.save_matrix(f"{save_data_dir}/Y_neighbor.test.npz", Y_csr_test)
+    smat_util.save_matrix(f"{save_data_dir}/Y_neighbor.test_all.npz", Y_csr_test_all)
     smat_util.save_matrix(f"{save_data_dir}/Y_neighbor.all.npz", Y_csr_all)
-    print("Saved Y_neighbor.trn.npz, Y_neighbor.val.npz, Y_neighbor.test.npz and Y_neighbor.all.npz")
+    print("Saved Y_neighbor.trn.npz, Y_neighbor.val.npz, Y_neighbor.test.npz, Y_neighbor.test_all.npz and Y_neighbor.all.npz")
 
     # Save node main-label matrix
     Y_main_all = data.y.flatten().detach().numpy()
@@ -110,11 +113,13 @@ def main():
     Y_main_trn = Y_main_all[train_idx]
     Y_main_val = Y_main_all[valid_idx]
     Y_main_test = Y_main_all[test_idx]
+    Y_main_test_all = Y_main_all[test_all_idx]
     np.save(f"{save_data_dir}/Y_main.all", Y_main_all, allow_pickle=False)
     np.save(f"{save_data_dir}/Y_main.trn", Y_main_trn, allow_pickle=False)
     np.save(f"{save_data_dir}/Y_main.val", Y_main_val, allow_pickle=False)
     np.save(f"{save_data_dir}/Y_main.test", Y_main_test, allow_pickle=False)
-    print("Saved Y_main.trn.npy, Y_main.val.npy, Y_main.test.npy and Y_main.all.npy")
+    np.save(f"{save_data_dir}/Y_main.test_all", Y_main_test_all, allow_pickle=False)
+    print("Saved Y_main.trn.npy, Y_main.val.npy, Y_main.test.npy, Y_main.test_all and Y_main.all.npy")
 
     # Apply the same filtering for raw text
     with open(args.raw_text_path, "r") as fin:
@@ -136,6 +141,8 @@ def main():
     print("Saved X.val.txt")
     filter_list(node_text_list, test_idx, save_path=f"{save_data_dir}/X.test.txt")
     print("Saved X.test.txt")
+    filter_list(node_text_list, test_all_idx, save_path=f"{save_data_dir}/X.test_all.txt")
+    print("Saved X.test_all.txt")
 
     # Apply the same filtering for tfidf features
     vectorizer_config = Vectorizer.load_config_from_args(args) # using args.vectorizer_config_path
@@ -145,11 +152,13 @@ def main():
     X_tfidf_trn = X_tfidf_all[train_idx]
     X_tfidf_val = X_tfidf_all[valid_idx]
     X_tfidf_test = X_tfidf_all[test_idx]
+    X_tfidf_test_all = X_tfidf_all[test_all_idx]
     smat_util.save_matrix(f"{save_data_dir}/X.all.tfidf.npz", X_tfidf_all)
     smat_util.save_matrix(f"{save_data_dir}/X.trn.tfidf.npz", X_tfidf_trn)
     smat_util.save_matrix(f"{save_data_dir}/X.val.tfidf.npz", X_tfidf_val)
     smat_util.save_matrix(f"{save_data_dir}/X.test.tfidf.npz", X_tfidf_test)
-    print("Saved X.trn.tfidf.npz, X.val.tfidf.npz, X.test.tfidf.npz and X.all.tfidf.npz")
+    smat_util.save_matrix(f"{save_data_dir}/X.test_all.tfidf.npz", X_tfidf_test_all)
+    print("Saved X.trn.tfidf.npz, X.val.tfidf.npz, X.test.tfidf.npz, X.test_all.tfidf.npz and X.all.tfidf.npz")
 
 
 def filter_list(original_list, indices, save_path):

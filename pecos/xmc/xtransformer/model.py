@@ -1678,7 +1678,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             X_text = saved_test_dir
 
         self.text_encoder.to_device(device, n_gpu=n_gpu)
-        _, embeddings = self.text_encoder.predict(
+        _, _, embeddings = self.text_encoder.predict(
             X_text,
             pred_params=encoder_pred_params,
             batch_size=batch_size * max(1, n_gpu),
