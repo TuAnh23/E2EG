@@ -12,6 +12,8 @@ import argparse
 import logging
 import os
 
+logging.basicConfig(level=logging.DEBUG)
+
 from pecos.utils import cli, logging_util, smat_util
 from pecos.utils.featurization.text.preprocess import Preprocessor
 
