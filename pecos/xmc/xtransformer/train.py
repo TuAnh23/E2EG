@@ -18,10 +18,11 @@ import sys
 import shutil
 from scipy.sparse import vstack
 
-logging.basicConfig(level=logging.DEBUG)
-
 import numpy as np
 from pecos.utils import cli, logging_util, smat_util, torch_util
+
+logging_util.setup_logging_config(level=3)
+
 from pecos.utils.cluster_util import ClusterChain
 from pecos.utils.featurization.text.preprocess import Preprocessor
 from pecos.xmc import PostProcessor

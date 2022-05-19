@@ -12,9 +12,10 @@ import argparse
 import logging
 import os
 
-logging.basicConfig(level=logging.DEBUG)
-
 from pecos.utils import cli, logging_util, smat_util
+
+logging_util.setup_logging_config(level=3)
+
 from pecos.utils.featurization.text.preprocess import Preprocessor
 
 from .model import XTransformer, XTransformerMultiTask
