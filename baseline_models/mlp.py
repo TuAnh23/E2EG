@@ -3,6 +3,8 @@ import argparse
 import torch
 import torch.nn.functional as F
 
+import numpy as np
+
 from logger import Logger
 import numpy as np
 from pecos.utils import smat_util
@@ -74,7 +76,7 @@ def test(model, x, y_true, split_idx, evaluator):
         'y_pred': y_pred[split_idx['test']],
     })['acc']
 
-    return train_acc, valid_acc, test_acc
+    return train_acc, valid_acc, test_acc, y_pred
 
 
 def main():
@@ -91,6 +93,7 @@ def main():
     parser.add_argument('--data_root_dir', type=str, default='../../dataset')
     parser.add_argument('--data_dir', type=str)
     parser.add_argument('--node_emb_path', type=str, default=None)
+    parser.add_argument('--save_pred', type=str, default="")
     args = parser.parse_args()
     print(args)
 
@@ -148,10 +151,21 @@ def main():
     for run in range(args.runs):
         model.reset_parameters()
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+
+        best_val = -1
         for epoch in range(1, 1 + args.epochs):
             loss = train(model, x, y_true, train_idx, optimizer)
-            result = test(model, x, y_true, split_idx, evaluator)
+            test_output = test(model, x, y_true, split_idx, evaluator)
+
+            result = test_output[:-1]  # train, val, test accuracies
             logger.add_result(run, result)
+
+            pred = test_output[-1]
+            if result[1] > best_val:
+                best_val = result[1]
+                if args.save_pred:
+                    print(f"Saving predictions at epoch {epoch}, run {run}.")
+                    np.save(f"{args.save_pred}/y_pred_run{run}.npy", pred.cpu().detach().numpy())
 
             if epoch % args.log_steps == 0:
                 train_acc, valid_acc, test_acc = result

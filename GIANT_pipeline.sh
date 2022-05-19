@@ -103,6 +103,7 @@ do
       --data_root_dir ${data_dir}/../../ \
       --data_dir ${data_dir} \
       --node_emb_path ${model_dir}/run${seed}/X.all.xrt-emb.npy \
+      --save_pred ${experiment_dir}/run${seed} \
       |& tee ${experiment_dir}/run${seed}/final_scores.txt
 done
 #==================== combine results ===================
