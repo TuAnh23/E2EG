@@ -374,7 +374,7 @@ class XTransformer(pecos.BaseClass):
                 train_params, cls.TrainParams, nr_transformers
             )
 
-            LOGGER.debug(
+            LOGGER.info(
                 f"XTransformer train_params: {json.dumps(train_params.to_dict(), indent=True)}"
             )
 
@@ -383,7 +383,7 @@ class XTransformer(pecos.BaseClass):
             )
             pred_params = pred_params.override_with_kwargs(kwargs)
 
-            LOGGER.debug(
+            LOGGER.info(
                 f"XTransformer pred_params: {json.dumps(pred_params.to_dict(), indent=True)}"
             )
 
@@ -396,7 +396,7 @@ class XTransformer(pecos.BaseClass):
                     result = smat_util.binarized(mat_true) + smat_util.binarized(mat_pred)
                 else:
                     raise ValueError("Unrecognized negative sampling method {}".format(scheme))
-                LOGGER.debug(
+                LOGGER.info(
                     f"Construct {scheme} with shape={result.shape} avr_M_nnz={result.nnz/result.shape[0]}"
                 )
                 return result
@@ -631,7 +631,7 @@ class XTransformer(pecos.BaseClass):
             pred_params = self.PredParams.from_dict(pred_params)
         pred_params.override_with_kwargs(kwargs)
 
-        LOGGER.debug(
+        LOGGER.info(
             f"Prediction with pred_params: {json.dumps(pred_params.to_dict(), indent=True)}"
         )
         if isinstance(pred_params.matcher_params_chain, list):
@@ -681,7 +681,7 @@ class XTransformer(pecos.BaseClass):
             embeddings,
             normalize_emb=True,
         )
-        LOGGER.debug(
+        LOGGER.info(
             "Constructed instance feature matrix with shape={}".format(cat_embeddings.shape)
         )
         pred_csr = self.concat_model.predict(
@@ -737,7 +737,7 @@ class XTransformer(pecos.BaseClass):
             pred_params = self.PredParams.from_dict(pred_params)
         pred_params.override_with_kwargs(kwargs)
 
-        LOGGER.debug(f"Encode with pred_params: {json.dumps(pred_params.to_dict(), indent=True)}")
+        LOGGER.info(f"Encode with pred_params: {json.dumps(pred_params.to_dict(), indent=True)}")
         if isinstance(pred_params.matcher_params_chain, list):
             encoder_pred_params = pred_params.matcher_params_chain[-1]
         else:
@@ -1160,7 +1160,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                 train_params, cls.TrainParams, nr_transformers
             )
 
-            LOGGER.debug(
+            LOGGER.info(
                 f"XTransformer train_params: {json.dumps(train_params.to_dict(), indent=True)}"
             )
 
@@ -1169,7 +1169,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             )
             pred_params = pred_params.override_with_kwargs(kwargs)
 
-            LOGGER.debug(
+            LOGGER.info(
                 f"XTransformer pred_params: {json.dumps(pred_params.to_dict(), indent=True)}"
             )
 
@@ -1182,7 +1182,7 @@ class XTransformerMultiTask(pecos.BaseClass):
                     result = smat_util.binarized(mat_true) + smat_util.binarized(mat_pred)
                 else:
                     raise ValueError("Unrecognized negative sampling method {}".format(scheme))
-                LOGGER.debug(
+                LOGGER.info(
                     f"Construct {scheme} with shape={result.shape} avr_M_nnz={result.nnz/result.shape[0]}"
                 )
                 return result
@@ -1555,7 +1555,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             pred_params = self.PredParams.from_dict(pred_params)
         pred_params.override_with_kwargs(kwargs)
 
-        LOGGER.debug(
+        LOGGER.info(
             f"Prediction with pred_params: {json.dumps(pred_params.to_dict(), indent=True)}"
         )
         if isinstance(pred_params.matcher_params_chain, list):
@@ -1646,7 +1646,7 @@ class XTransformerMultiTask(pecos.BaseClass):
             pred_params = self.PredParams.from_dict(pred_params)
         pred_params.override_with_kwargs(kwargs)
 
-        LOGGER.debug(f"Encode with pred_params: {json.dumps(pred_params.to_dict(), indent=True)}")
+        LOGGER.info(f"Encode with pred_params: {json.dumps(pred_params.to_dict(), indent=True)}")
         if isinstance(pred_params.matcher_params_chain, list):
             encoder_pred_params = pred_params.matcher_params_chain[-1]
         else:

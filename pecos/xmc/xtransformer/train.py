@@ -16,12 +16,14 @@ import logging
 import os
 import sys
 import shutil
+import tempfile
+
 from scipy.sparse import vstack
 
 import numpy as np
 from pecos.utils import cli, logging_util, smat_util, torch_util
 
-logging_util.setup_logging_config(level=3)
+logging_util.setup_logging_config(level=2)
 
 from pecos.utils.cluster_util import ClusterChain
 from pecos.utils.featurization.text.preprocess import Preprocessor
@@ -910,6 +912,19 @@ def do_train(args):
                                                 replace=False)
             else:
                 kept_val_idx = np.arange(len(val_corpus))  # Keep everything
+
+            if args.memmap:
+                if os.path.isdir(args.saved_trn_pt):
+                    try:
+                        kept_test_idx = np.load(f"{args.saved_trn_pt}_kept_test_idx.npy")
+                        kept_val_idx = np.load(f"{args.saved_trn_pt}_kept_val_idx.npy")
+                        assert len(kept_test_idx) == int(args.test_portion_for_training * len(test_corpus))
+                        assert len(kept_val_idx) == int(args.val_portion_for_training * len(val_corpus))
+                    except:
+                        args.saved_trn_pt = tempfile.TemporaryDirectory().name
+                elif args.saved_trn_pt is not None:
+                    np.save(f"{args.saved_trn_pt}_kept_test_idx.npy", kept_test_idx)
+                    np.save(f"{args.saved_trn_pt}_kept_val_idx.npy", kept_val_idx)
 
             trn_corpus = trn_corpus + [val_corpus[i] for i in kept_val_idx] + [test_corpus[i] for i in kept_test_idx]
             Y_trn_mclass = np.concatenate(

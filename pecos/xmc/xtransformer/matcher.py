@@ -1410,8 +1410,8 @@ class TransformerMatcher(pecos.BaseClass):
         """
         train_params = cls.TrainParams.from_dict(train_params)
         pred_params = cls.PredParams.from_dict(pred_params)
-        LOGGER.debug(f"TransformerMatcher train_params: {train_params.to_dict()}")
-        LOGGER.debug(f"TransformerMatcher pred_params: {pred_params.to_dict()}")
+        LOGGER.info(f"TransformerMatcher train_params: {train_params.to_dict()}")
+        LOGGER.info(f"TransformerMatcher pred_params: {pred_params.to_dict()}")
         if prob.X_feat is None:
             pred_params.ensemble_method = "transformer-only"
 
@@ -1626,7 +1626,7 @@ class TransformerMatcher(pecos.BaseClass):
             avr_val_beam = (
                 1 if val_csr_codes is None else val_csr_codes.nnz / val_csr_codes.shape[0]
             )
-            LOGGER.debug("avr_beam={}".format(avr_val_beam))
+            LOGGER.info("avr_beam={}".format(avr_val_beam))
             LOGGER.info(
                 "| {} test-prec {}".format(
                     val_type,
@@ -3210,8 +3210,8 @@ class TransformerMultiTask(pecos.BaseClass):
         """
         train_params = cls.TrainParams.from_dict(train_params)
         pred_params = cls.PredParams.from_dict(pred_params)
-        LOGGER.debug(f"TransformerMultiTask train_params: {train_params.to_dict()}")
-        LOGGER.debug(f"TransformerMultiTask pred_params: {pred_params.to_dict()}")
+        LOGGER.info(f"TransformerMultiTask train_params: {train_params.to_dict()}")
+        LOGGER.info(f"TransformerMultiTask pred_params: {pred_params.to_dict()}")
         if prob.X_feat is None:
             pred_params.ensemble_method = "transformer-only"
 
@@ -3476,7 +3476,7 @@ class TransformerMultiTask(pecos.BaseClass):
             avr_train_beam = (
                 1 if csr_codes is None else csr_codes.nnz / csr_codes.shape[0]
             )
-            LOGGER.debug("avr_beam={}".format(avr_train_beam))
+            LOGGER.info("avr_beam={}".format(avr_train_beam))
             LOGGER.info(
                 "| {} mlabel-train-prec {}".format(
                     train_type,
@@ -3502,7 +3502,7 @@ class TransformerMultiTask(pecos.BaseClass):
             avr_val_beam = (
                 1 if val_csr_codes is None else val_csr_codes.nnz / val_csr_codes.shape[0]
             )
-            LOGGER.debug("avr_beam={}".format(avr_val_beam))
+            LOGGER.info("avr_beam={}".format(avr_val_beam))
             LOGGER.info(
                 "| {} mlabel-test-prec {}".format(
                     val_type,
