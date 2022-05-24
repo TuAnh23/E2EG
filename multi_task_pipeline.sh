@@ -66,7 +66,7 @@ do
   fi
   #==================== train ===================
   # Store the timestamp of the start of this run to use as runID for wandb
-  timestamp=$(date +%s)
+  timestamp=$(date +%s%N)
   python -m pecos.xmc.xtransformer.train \
       --trn-text-path ${X_trn_txt_path} \
       --trn-feat-path ${X_trn_npz_path} \
