@@ -131,7 +131,9 @@ do
     --save-pred-path-mclass ${experiment_dir}/run${seed}/${dir}_prediction_mclass \
     --multi-task \
     --seed ${seed}
-
+  # Remove everything except for the best round
+  find ./${model_dir}/run${seed}/ -mindepth 1 -maxdepth 1 -type d -not -name round${best_round} -exec rm -rf '{}' \;
+  
   #==================== eval ===================
   # Calculate the test scores
   echo ${dir} | tee -a ${experiment_dir}/run${seed}/test_scores.txt
