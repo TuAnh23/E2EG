@@ -221,8 +221,8 @@ def main():
     best_model_path = None
     best_val_acc = -1
     for filename in os.listdir(args.model_dir):
-        if filename.endswith('.pt') and float(str(filename)[7:12]) > best_val_acc:
-            best_val_acc = float(str(filename)[7:12])
+        if filename.endswith('.pt') and float(str(filename)[7:13]) > best_val_acc:
+            best_val_acc = float(str(filename)[7:13])
             best_model_path = os.path.join(args.model_dir, filename)
     print(f'Best model path: {best_model_path}')
     best_model = torch.load(best_model_path)

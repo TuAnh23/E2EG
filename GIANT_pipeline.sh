@@ -92,7 +92,6 @@ do
       -t ${X_txt_path} \
       -m ${model_dir}/run${seed}/last \
       -o ${model_dir}/run${seed}/X.all.xrt-emb.npy \
-      --saved-test-pt ${X_test_pt_path} \
       --memmap "true" \
       --batch-size 64 \
       --verbose-level 3 \
