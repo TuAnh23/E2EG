@@ -144,6 +144,11 @@ def main():
 
     model = MLP(x.size(-1), args.hidden_channels, nr_classes,
                 args.num_layers, args.dropout).to(device)
+    print(
+        "Number of parameters: {}".format(
+            sum(p.numel() for p in model.parameters())
+        )
+    )
 
     evaluator = Evaluator(name=dataset_name)
     logger = Logger(args.runs, args)

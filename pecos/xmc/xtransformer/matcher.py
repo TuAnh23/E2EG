@@ -1538,6 +1538,13 @@ class TransformerMatcher(pecos.BaseClass):
             del bootstrapping, init_encoder, init_embeddings, prev_head, bootstrap_prob
             gc.collect()
 
+        LOGGER.info(
+            "Number of parameters: {}".format(
+                sum(p.numel() for p in matcher.text_encoder.parameters()) + sum(
+                    p.numel() for p in matcher.text_model.parameters())
+            )
+        )
+
         # move matcher to desired hardware
         device, n_gpu = torch_util.setup_device(train_params.use_gpu)
         matcher.to_device(device, n_gpu)
@@ -3369,6 +3376,13 @@ class TransformerMultiTask(pecos.BaseClass):
         if freeze_BERT:
             for bert_param in matcher.transformer_component.parameters():
                 bert_param.requires_grad = False
+
+        LOGGER.info(
+            "Number of parameters: {}".format(
+                sum(p.numel() for p in matcher.text_encoder.parameters()) + sum(
+                    p.numel() for p in matcher.text_model.parameters())
+            )
+        )
 
         # move matcher to desired hardware
         device, n_gpu = torch_util.setup_device(train_params.use_gpu)
