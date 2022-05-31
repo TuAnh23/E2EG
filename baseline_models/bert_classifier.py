@@ -214,6 +214,11 @@ def main():
 
     # Train the model
     model = BertClassifier(num_classes=torch.max(y)+1, dropout=args.dropout, pretrain=args.pretrain)
+    print(
+        "Number of parameters: {}".format(
+            sum(p.numel() for p in model.parameters())
+        )
+    )
     train(model, [X[i] for i in train_idx], y[train_idx], [X[i] for i in valid_idx], y[valid_idx],
           args.learning_rate, args.epochs, args.batch_size, args.adam_epsilon, args.model_dir)
 

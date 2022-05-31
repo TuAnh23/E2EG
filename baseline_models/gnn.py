@@ -166,6 +166,12 @@ def main():
                     dataset.num_classes, args.num_layers,
                     args.dropout).to(device)
 
+    print(
+        "Number of parameters: {}".format(
+            sum(p.numel() for p in model.parameters())
+        )
+    )
+
     evaluator = Evaluator(name='ogbn-arxiv')
     logger = Logger(args.runs, args)
 
