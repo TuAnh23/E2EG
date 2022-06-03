@@ -171,7 +171,7 @@ bash hyperparams_sweep.sh ${data_dir} ${model_dir} ${experiment_dir} ${cache_dir
 ```
 
 #### 2.2.3. Use E2EG for text embedding
-After training an E2EG model according to [2.2.1](#2.2.1.-Train-and-evaluate-E2EG-models), run the following to get the text embedding using E2EG:
+After training an E2EG model according to [2.2.1](#221-train-and-evaluate-e2eg-models), run the following to get the text embedding using E2EG:
 ```bash
 dataset=ogbn-arxiv  # or ogbn-products
 experiment_name=E2EG
