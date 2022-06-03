@@ -1,0 +1,23 @@
+program: pecos.xmc.xtransformer.train
+method: grid
+metric:
+  name: final_val_acc
+  goal: maximize
+parameters:
+  numb-layers-mclass-pred:
+    values: [2, 3]
+  mclass-pred-dropout-prob:
+    values: [0, 0.2]
+  mclass-pred-batchnorm:
+    values: ["yes", "no"]
+  mclass-pred-hidden-size:
+    value: 256
+command:
+  - ${interpreter}
+  - "-m"
+  - ${program}
+  - "--non-swept-params-path"
+  - "sweep_configs/main_head_sweep_products/training_config.json"
+  - "--wandb-sweep"
+  - "yes"
+  - ${args}
