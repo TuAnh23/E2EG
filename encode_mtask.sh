@@ -43,7 +43,7 @@ start_seed=0
 end_seed=runs-1
 for (( seed=$start_seed; seed<=$end_seed; seed++ ))
 do
-	if [ -f "${model_dir}/run${seed}/X.all.xrt-emb.npy" ]
+	if [ -f "${model_dir}/run${seed}/X.all.e2eg-emb.npy" ]
 	then
 	  echo "Text encoding for run${seed} exists, skip this run"
 	  continue 1
@@ -65,7 +65,7 @@ do
   python -m pecos.xmc.xtransformer.encode \
       -t ${X_txt_path} \
       -m ${model_dir}/run${seed}/round${best_round} \
-      -o ${model_dir}/run${seed}/X.all.xrt-emb.npy \
+      -o ${model_dir}/run${seed}/X.all.e2eg-emb.npy \
       --memmap "true" \
       --batch-size 64 \
       --verbose-level 3 \

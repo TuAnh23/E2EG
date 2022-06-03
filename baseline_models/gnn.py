@@ -1,5 +1,5 @@
 """
-Code derived from OGB for ogbn-arxiv dataset:
+Code derived from OGB:
 https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/arxiv
 We add the option of only using node degree feature, and not node text feature.
 """
@@ -118,7 +118,8 @@ def test(model, data, split_idx, evaluator):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='OGBN-Arxiv (GNN)')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset_name', type=str, default='ogbn-arxiv')
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--log_steps', type=int, default=1)
     parser.add_argument('--node_feature', type=str, default='default',
@@ -137,7 +138,7 @@ def main():
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
-    dataset = PygNodePropPredDataset(name='ogbn-arxiv',
+    dataset = PygNodePropPredDataset(name=args.dataset_name,
                                      root='data')
 
     data = dataset[0]
@@ -172,7 +173,7 @@ def main():
         )
     )
 
-    evaluator = Evaluator(name='ogbn-arxiv')
+    evaluator = Evaluator(name=args.dataset_name)
     logger = Logger(args.runs, args)
 
     for run in range(args.runs):

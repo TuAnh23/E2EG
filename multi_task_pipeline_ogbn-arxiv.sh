@@ -5,6 +5,7 @@ experiment_dir=$3
 cache_dir=$4
 params_path=$5
 runs=$6
+wandb_username="None"  # Replace with your username if use wandb 
 if [ -z ${data_dir} ] || [ ! -d ${data_dir} ]; then
     echo "DATA_DIR does not exist: ${data_dir}"
     exit
@@ -91,7 +92,7 @@ do
       --saved-trn-pt ${X_trn_pt_path} \
       --saved-val-pt ${X_val_pt_path} \
       --seed ${seed} \
-      --wandb-username tuanh \
+      --wandb-username ${wandb_username} \
       --wandb-run-id ${timestamp} \
       --weight-loss-strategy "include_mclass_loss_later_at_round_2" \
       --numb-layers-mclass-pred 1 \
@@ -100,7 +101,7 @@ do
       --mclass-pred-hidden-size 256 \
       --freeze-mclass-head-range "None" \
       --include-Xval-Xtest-for-training "true" \
-      --model-shortcut "distilbert-base-uncased" \
+      --model-shortcut "sentence-transformers/all-distilroberta-v1" \
       --include-additional-mclass-round-HEAD "true" \
       --test-portion-for-training "None" \
       --val-portion-for-training "None" \
@@ -145,7 +146,7 @@ do
   # Calculate and log the final best validation score and corresponding test score from this run
   python -m pecos.xmc.xtransformer.final_metrics_collection \
     --experiment_dir ${experiment_dir}/run${seed} \
-    --wandb-username tuanh \
+    --wandb-username ${wandb_username} \
     --wandb-run-id ${timestamp} \
     | tee ${experiment_dir}/run${seed}/final_scores.txt
 done

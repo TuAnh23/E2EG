@@ -657,7 +657,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--wandb-username",
-        type=str,
+        type=none_or_str,
         default=None,
         help="Username if want to log results to wandb. If not passed, do not use wandb",
     )
