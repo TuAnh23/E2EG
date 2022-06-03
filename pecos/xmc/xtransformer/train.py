@@ -898,33 +898,42 @@ def do_train(args):
     if args.trn_class_path is not None and args.trn_label_path:
         # This is a multi-task problem
         if args.include_Xval_Xtest_for_training:
-            # Include val and test to the training data, except for the mclass target
-            if args.test_portion_for_training is not None:
-                kept_test_idx = np.random.choice(np.arange(len(test_corpus)),
-                                                 size=int(args.test_portion_for_training*len(test_corpus)),
-                                                 replace=False)
+            # # Include val and test to the training data, except for the mclass target
+            # if args.test_portion_for_training is not None:
+            #     kept_test_idx = np.random.choice(np.arange(len(test_corpus)),
+            #                                      size=int(args.test_portion_for_training*len(test_corpus)),
+            #                                      replace=False)
+            # else:
+            #     kept_test_idx = np.arange(len(test_corpus))  # Keep everything
+            #
+            # if args.val_portion_for_training is not None:
+            #     kept_val_idx = np.random.choice(np.arange(len(val_corpus)),
+            #                                     size=int(args.val_portion_for_training * len(val_corpus)),
+            #                                     replace=False)
+            # else:
+            #     kept_val_idx = np.arange(len(val_corpus))  # Keep everything
+
+            # if args.memmap:
+            #     if os.path.isdir(args.saved_trn_pt):
+            #         try:
+            #             kept_test_idx = np.load(f"{args.saved_trn_pt}_kept_test_idx.npy")
+            #             kept_val_idx = np.load(f"{args.saved_trn_pt}_kept_val_idx.npy")
+            #             assert len(kept_test_idx) == int(args.test_portion_for_training * len(test_corpus))
+            #             assert len(kept_val_idx) == int(args.val_portion_for_training * len(val_corpus))
+            #         except:
+            #             args.saved_trn_pt = tempfile.TemporaryDirectory().name
+            #     elif args.saved_trn_pt is not None:
+            #         np.save(f"{args.saved_trn_pt}_kept_test_idx.npy", kept_test_idx)
+            #         np.save(f"{args.saved_trn_pt}_kept_val_idx.npy", kept_val_idx)
+
+            if args.test_portion_for_training is not None and args.val_portion_for_training is not None:
+                kept_test_idx = np.load(f"{args.saved_trn_pt}_kept_test_idx.npy")
+                kept_val_idx = np.load(f"{args.saved_trn_pt}_kept_val_idx.npy")
+                assert len(kept_test_idx) == int(args.test_portion_for_training * len(test_corpus))
+                assert len(kept_val_idx) == int(args.val_portion_for_training * len(val_corpus))
             else:
                 kept_test_idx = np.arange(len(test_corpus))  # Keep everything
-
-            if args.val_portion_for_training is not None:
-                kept_val_idx = np.random.choice(np.arange(len(val_corpus)),
-                                                size=int(args.val_portion_for_training * len(val_corpus)),
-                                                replace=False)
-            else:
                 kept_val_idx = np.arange(len(val_corpus))  # Keep everything
-
-            if args.memmap:
-                if os.path.isdir(args.saved_trn_pt):
-                    try:
-                        kept_test_idx = np.load(f"{args.saved_trn_pt}_kept_test_idx.npy")
-                        kept_val_idx = np.load(f"{args.saved_trn_pt}_kept_val_idx.npy")
-                        assert len(kept_test_idx) == int(args.test_portion_for_training * len(test_corpus))
-                        assert len(kept_val_idx) == int(args.val_portion_for_training * len(val_corpus))
-                    except:
-                        args.saved_trn_pt = tempfile.TemporaryDirectory().name
-                elif args.saved_trn_pt is not None:
-                    np.save(f"{args.saved_trn_pt}_kept_test_idx.npy", kept_test_idx)
-                    np.save(f"{args.saved_trn_pt}_kept_val_idx.npy", kept_val_idx)
 
             trn_corpus = trn_corpus + [val_corpus[i] for i in kept_val_idx] + [test_corpus[i] for i in kept_test_idx]
             Y_trn_mclass = np.concatenate(
