@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import re
+from datetime import datetime
 
 
 def main():
@@ -10,7 +11,8 @@ def main():
     args = parser.parse_args()
     print(args)
 
-    scores_per_round(args.experiment_dir, args.runs, f"{args.experiment_dir}/scores_per_round.txt")
+    # scores_per_round(args.experiment_dir, args.runs, f"{args.experiment_dir}/scores_per_round.txt")
+    calculate_train_time(args.experiment_dir, args.runs, f"{args.experiment_dir}/train_time.txt")
 
     val_accs = []
     train_accs = []
@@ -31,6 +33,29 @@ def main():
     print(f'Highest Valid: {np.array(val_accs).mean()} ± {np.array(val_accs).std()}')
     print(f'Final Train: {np.array(train_accs).mean()} ± {np.array(train_accs).std()}')
     print(f'Final Test: {np.array(test_accs).mean()} ± {np.array(test_accs).std()}')
+
+
+def calculate_train_time(experiment_dir, runs, out_file):
+    train_times = []
+    output = ""
+
+    for run in range(0, runs):
+        train_log_path = f"{experiment_dir}/run{run}/train.log"
+        # Extract runtime
+        with open(train_log_path, "r") as file:
+            train_log = file.read()
+        time_stamps = re.findall('../../.... ..:..:..', train_log)
+        start = datetime.strptime(time_stamps[0], "%m/%d/%Y %H:%M:%S")
+        end = datetime.strptime(time_stamps[-1], "%m/%d/%Y %H:%M:%S")
+        train_time = (end - start).total_seconds() / 3600.0
+        output = output + f"\nRun{run}: {train_time} hours"
+        train_times.append(train_time)
+
+    train_times = np.array(train_times)
+    output = output + f"\nAverage train time: {train_times.mean()} ± {train_times.std()}"
+
+    with open(out_file, 'w') as f:
+        f.write(output)
 
 
 def scores_per_round(experiment_dir, runs, out_file):
@@ -54,8 +79,8 @@ def scores_per_round(experiment_dir, runs, out_file):
     output = ""
     for round_i in range(0, val_scores.shape[1]):
         output = output + f"Round {round_i}: \n" + \
-            f"Train acc: {train_scores[:,round_i].mean()} ± {train_scores[:,round_i].std()}\n" + \
-            f"Val acc: {val_scores[:, round_i].mean()} ± {val_scores[:, round_i].std()}\n\n"
+                 f"Train acc: {train_scores[:, round_i].mean()} ± {train_scores[:, round_i].std()}\n" + \
+                 f"Val acc: {val_scores[:, round_i].mean()} ± {val_scores[:, round_i].std()}\n\n"
 
     with open(out_file, 'w') as f:
         f.write(output)
